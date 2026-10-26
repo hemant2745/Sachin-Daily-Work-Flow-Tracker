@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -19,6 +19,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { signOutAction } from "@/app/auth/actions";
 
 interface NavItem {
   name: string;
@@ -40,7 +41,14 @@ const navigationItems: NavItem[] = [
 
 export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
+
+  const handleSignOut = () => {
+    startTransition(async () => {
+      await signOutAction();
+    });
+  };
 
   return (
     <>
@@ -150,7 +158,7 @@ export function Sidebar() {
           <div className="flex items-start gap-2">
             <Sparkles className="w-3.5 h-3.5 text-brand-orange mt-0.5 shrink-0" />
             <div className="text-[11px] text-gray-300 leading-snug">
-              <span className="font-semibold text-white">Phase 1 Foundation:</span> Visual architecture preview with zero fabricated live data.
+              <span className="font-semibold text-white">Phase 2 Security:</span> Supabase SSR auth with server-enforced single-admin allowlist.
             </div>
           </div>
         </div>
@@ -167,13 +175,15 @@ export function Sidebar() {
                 <p className="text-[10px] text-gray-300 truncate">Team Leader (Admin)</p>
               </div>
             </div>
-            <Link
-              href="/login"
-              title="Return to Login Screen"
-              className="p-1.5 rounded-lg text-gray-300 hover:text-white hover:bg-navy-800 transition-colors"
+            <button
+              onClick={handleSignOut}
+              disabled={isPending}
+              title="Sign Out"
+              className="p-1.5 rounded-lg text-gray-300 hover:text-white hover:bg-navy-800 transition-colors disabled:opacity-50"
+              aria-label="Sign out"
             >
               <LogOut className="w-4 h-4" />
-            </Link>
+            </button>
           </div>
         </div>
       </aside>

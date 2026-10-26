@@ -1,59 +1,105 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Lock, Mail, AlertCircle, Info, ArrowRight, ShieldCheck } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  AlertCircle,
+  Info,
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  KeyRound,
+} from "lucide-react";
+import { signInAction } from "@/app/auth/actions";
 
 export function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [authStatusMessage, setAuthStatusMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
+
+  // Read URL status flags
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    const noticeParam = searchParams.get("notice");
+    const messageParam = searchParams.get("message");
+
+    if (errorParam === "unauthenticated") {
+      setErrorMessage("Authentication required. Please sign in with your administrator account to access the dashboard.");
+    } else if (errorParam === "unauthorized") {
+      setErrorMessage("Access denied. Your account is not authorized as an administrator for Sachin Behera Daily Workflow.");
+    } else if (errorParam === "session_expired") {
+      setErrorMessage("Your administrator session has expired. Please sign in again.");
+    }
+
+    if (noticeParam === "setup_required") {
+      setSuccessNotice("Phase 2 Supabase Setup: Remote credentials are not configured in .env.local yet. Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to enable live authentication.");
+    } else if (messageParam === "signed_out") {
+      setSuccessNotice("You have successfully signed out of the administrator portal.");
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setValidationError(null);
-    setAuthStatusMessage(null);
+    setErrorMessage(null);
 
-    // Client-side validation
-    if (!email.trim()) {
-      setValidationError("Please enter your administrator email or work ID.");
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setErrorMessage("Please enter your administrator email.");
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      setValidationError("Please enter a valid administrator email address.");
+    if (!emailRegex.test(trimmedEmail)) {
+      setErrorMessage("Please enter a valid administrator email address.");
       return;
     }
 
     if (!password) {
-      setValidationError("Please enter your password.");
+      setErrorMessage("Please enter your password.");
       return;
     }
 
-    if (password.length < 6) {
-      setValidationError("Password must be at least 6 characters.");
-      return;
-    }
-
-    // Trigger loading state for verification demonstration
     setIsLoading(true);
 
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append("email", trimmedEmail);
+      formData.append("password", password);
+
+      const result = await signInAction(formData);
+
+      if (!result.success) {
+        setErrorMessage(result.error || "Authentication failed. Please verify your credentials.");
+        setIsLoading(false);
+        return;
+      }
+
+      // Successful authentication & authorized administrator
+      if (result.redirectTo) {
+        router.push(result.redirectTo);
+        router.refresh();
+      }
+    } catch {
+      setErrorMessage("An unexpected network or service error occurred. Please try again.");
       setIsLoading(false);
-      // Phase 1 requirement: Do not simulate successful login or claim authentication is active
-      setAuthStatusMessage(
-        "Phase 1 Verification: Authentication system is not yet active. Supabase auth integration will be connected in a future phase. You can explore the Dashboard Visual Preview below."
-      );
-    }, 800);
+    }
   };
 
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="bg-navy-900/90 border border-navy-700/80 rounded-2xl p-6 sm:p-8 shadow-panel backdrop-blur-md">
+        
         {/* Administrator Badge */}
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-navy-800">
           <div className="flex items-center space-x-2">
@@ -73,39 +119,28 @@ export function LoginForm() {
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-white tracking-tight">Admin Sign In</h2>
           <p className="text-sm text-gray-300 mt-1">
-            Access restricted strictly to Sachin Behera (Team Leader). Counselors do not have login accounts.
+            Access strictly restricted to Sachin Behera (Team Leader). Counselors do not have login accounts.
           </p>
         </div>
 
-        {/* Phase Notice */}
-        <div className="mb-5 p-3.5 bg-navy-800/80 border-l-4 border-brand-orange rounded-r-lg">
-          <div className="flex items-start gap-2.5">
+        {/* Informative Notification Banner */}
+        {successNotice && (
+          <div className="mb-5 p-3.5 bg-navy-800/90 border-l-4 border-brand-orange rounded-r-lg flex items-start gap-2.5">
             <Info className="w-4 h-4 text-brand-orange mt-0.5 shrink-0" />
-            <div className="text-xs text-gray-300 leading-relaxed">
-              <span className="font-semibold text-white">Phase 1 UI Notice: </span>
-              Authentication is intentionally not connected to live Supabase backend in this phase.
-            </div>
-          </div>
-        </div>
-
-        {/* Validation Error Message */}
-        {validationError && (
-          <div className="mb-5 p-3.5 bg-red-950/60 border border-red-500/50 rounded-lg flex items-start gap-2.5 animate-fadeIn">
-            <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-            <p className="text-xs text-red-200">{validationError}</p>
+            <p className="text-xs text-gray-200 leading-relaxed">{successNotice}</p>
           </div>
         )}
 
-        {/* Auth Notice Message after submit */}
-        {authStatusMessage && (
-          <div className="mb-5 p-3.5 bg-amber-950/50 border border-amber-500/40 rounded-lg flex items-start gap-2.5">
-            <ShieldCheck className="w-4 h-4 text-brand-orange mt-0.5 shrink-0" />
-            <p className="text-xs text-amber-200 leading-relaxed">{authStatusMessage}</p>
+        {/* Error Message Display */}
+        {errorMessage && (
+          <div className="mb-5 p-3.5 bg-red-950/70 border border-red-500/50 rounded-lg flex items-start gap-2.5 animate-fadeIn">
+            <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-red-200 leading-relaxed">{errorMessage}</p>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          {/* Email / ID Field */}
+          {/* Email Field */}
           <div>
             <label htmlFor="email" className="block text-xs font-medium text-gray-200 mb-1.5 uppercase tracking-wider">
               Administrator Email
@@ -117,6 +152,7 @@ export function LoginForm() {
               <input
                 id="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="sachin.behera@collegevidya.com"
@@ -138,6 +174,7 @@ export function LoginForm() {
               <input
                 id="password"
                 type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
@@ -183,30 +220,27 @@ export function LoginForm() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                <span>Validating Request...</span>
+                <span>Authenticating with Supabase...</span>
               </>
             ) : (
               <>
-                <span>Sign In to Portal</span>
-                <ArrowRight className="w-4 h-4" />
+                <KeyRound className="w-4 h-4" />
+                <span>Sign In as Administrator</span>
               </>
             )}
           </button>
         </form>
 
-        {/* Dashboard Visual Preview Shortcut */}
-        <div className="mt-6 pt-5 border-t border-navy-800 text-center">
-          <p className="text-xs text-gray-300 mb-2.5">
-            Looking to inspect the visual architecture preview?
-          </p>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-orange hover:text-orange-400 transition-colors"
-          >
-            <span>Proceed to Dashboard Visual Preview</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+        {/* Phase 2 Security Architecture Footnote */}
+        <div className="mt-6 pt-5 border-t border-navy-800 text-left">
+          <div className="flex items-start gap-2 text-[11px] text-gray-400">
+            <ShieldCheck className="w-3.5 h-3.5 text-brand-orange shrink-0 mt-0.5" />
+            <span>
+              Server-enforced authorization active. Only accounts in the trusted administrator allowlist are permitted.
+            </span>
+          </div>
         </div>
+
       </div>
     </div>
   );

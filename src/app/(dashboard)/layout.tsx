@@ -1,12 +1,35 @@
 import React from "react";
+import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Header } from "@/components/dashboard/Header";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/server";
+import { evaluateSessionAccess } from "@/lib/auth/admin";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Defense-in-depth: Server-side authorization check on dashboard layout
+  if (isSupabaseConfigured()) {
+    const supabase = createClient();
+    try {
+      const { data } = await supabase.auth.getUser();
+      const evaluation = evaluateSessionAccess(data.user);
+
+      if (evaluation.status === "UNAUTHENTICATED") {
+        redirect("/login?error=unauthenticated");
+      }
+
+      if (evaluation.status === "UNAUTHORIZED_USER") {
+        redirect("/login?error=unauthorized");
+      }
+    } catch {
+      redirect("/login?error=unauthenticated");
+    }
+  }
+
   return (
     <div className="min-h-screen bg-surface-light flex">
       {/* Sidebar Navigation */}

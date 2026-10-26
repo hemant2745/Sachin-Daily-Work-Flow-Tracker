@@ -6,24 +6,25 @@
 
 ## Overview
 
-**Sachin Behera Daily Workflow** is an administrative system designed for:
+**Sachin Behera Daily Workflow** is a dedicated administrative system engineered for:
 - Daily task and subtask allocation
 - Counselor performance record tracking (counselors are managed as records; no individual counselor login accounts exist)
 - Monthly targets and verified revenue tracking
 - Admissions pipeline management
 - Projection evaluations and operational reporting
 
-This project replaces a legacy implementation with an architectural foundation built on Next.js 14 (App Router), TypeScript (Strict Mode), and Tailwind CSS, prepared for future Supabase authentication and PostgreSQL database integration.
+This project replaces the legacy implementation with an architectural foundation built on Next.js 14 (App Router), TypeScript (Strict Mode), Tailwind CSS, and isolated Supabase authentication with PostgreSQL Row-Level Security (RLS).
 
 ---
 
-## Tech Stack (Phase 1)
+## Tech Stack
 
 - **Framework**: Next.js 14.2.15 (App Router)
 - **Language**: TypeScript 5.6.3 (Strict Mode)
+- **Authentication**: Supabase Auth via `@supabase/ssr` 0.5.1 with Server Actions & Middleware session refresh
+- **Database**: Dedicated PostgreSQL (Supabase) with strict Row-Level Security (RLS)
 - **Styling**: Tailwind CSS 3.4.14
 - **Icons**: Lucide React 0.453.0
-- **Database / Auth Client**: Supabase JS 2.45.6 & Supabase SSR 0.5.1 (Prepared for Phase 2 integration)
 - **Design System Palette**:
   - Dark Navy: `#142536` (`#09121B`, `#0E1A26`, `#142536`, `#1D3248`)
   - Primary Orange: `#FF7A00` (`#E86B00`, `#FFA856`)
@@ -32,12 +33,24 @@ This project replaces a legacy implementation with an architectural foundation b
 
 ---
 
-## Phase 1 Status & Safeguards
+## Phase 2 Architecture: Supabase Auth & Database Foundation
 
-- **Authentication UI Only**: The login page displays full validation, loading, error, and notice states. Supabase backend auth is intentionally not connected in Phase 1, and no mock session/login simulation is permitted.
-- **Zero Fabricated Business Data**: The dashboard preview features 6 required metric cards (Team Monthly Target, Team Revenue Achieved, Team Achievement Percentage, Total Admissions, Pending Tasks, Pending Projection Evaluations) all displaying neutral placeholders (`"Not configured"` / `"Data will appear after setup"`).
-- **Supplied Hero Image**: The exact reference image (`C:\sachin\photo.png`) has been placed in `public/images/sachin-workflow-hero.png` and is utilized as the visual hero banner across both the login and dashboard pages without distortion or facial cropping.
-- **Previous Project & Database Preservation**: The legacy directory `C:\Sachin Daily Work Flow Tracker` and any previous databases have been preserved untouched.
+### 1. Server-Side Single-Administrator Authorization
+- Only Sachin Behera's explicitly configured administrator account can access the portal.
+- All authorization decisions are strictly enforced server-side via trusted environment variable allowlists (`ADMIN_EMAIL`) and database policies.
+- Client browser code has no ability to elevate privileges.
+- Any authenticated session whose email does not match the administrator allowlist is immediately terminated and redirected with `Access Denied`.
+
+### 2. SSR Cookie-Based Session Pattern
+- Session cookies are securely read and refreshed on every request using Next.js Middleware (`src/middleware.ts`).
+- Server actions (`src/app/auth/actions.ts`) manage sign-in and sign-out cleanly.
+- Unauthenticated requests to `/dashboard` are redirected to `/login?redirect=/dashboard&error=unauthenticated`.
+- Authenticated administrator requests to `/login` are automatically redirected to `/dashboard`.
+
+### 3. Isolated Dedicated Supabase Project
+- Complete isolation from legacy databases.
+- Initial migration created in `supabase/migrations/20261026000000_create_admin_authorization.sql`.
+- Complete blueprint for future entities documented in `supabase/SCHEMA_BLUEPRINT.md`.
 
 ---
 
@@ -47,33 +60,48 @@ This project replaces a legacy implementation with an architectural foundation b
 c:\sachin to-do-list/
 ├── public/
 │   └── images/
-│       └── sachin-workflow-hero.png    # Supplied reference image (2048x768)
+│       └── sachin-workflow-hero.png          # Supplied reference image (2048x768)
 ├── src/
 │   ├── app/
 │   │   ├── (auth)/
 │   │   │   └── login/
-│   │   │       └── page.tsx            # Administrator login page
+│   │   │       └── page.tsx                  # Administrator login page
 │   │   ├── (dashboard)/
 │   │   │   ├── dashboard/
-│   │   │   │   └── page.tsx            # Dashboard visual preview & placeholder cards
-│   │   │   └── layout.tsx              # Dashboard layout with responsive sidebar
-│   │   ├── globals.css                 # Base Tailwind styling & color variables
-│   │   ├── layout.tsx                  # Root layout
-│   │   └── page.tsx                    # Root redirection to /login
+│   │   │   │   └── page.tsx                  # Dashboard preview & placeholder cards
+│   │   │   └── layout.tsx                    # Protected dashboard layout with server auth
+│   │   ├── auth/
+│   │   │   └── actions.ts                    # Server actions (signInAction, signOutAction)
+│   │   ├── globals.css                       # Base Tailwind styling & variables
+│   │   ├── layout.tsx                        # Root layout
+│   │   └── page.tsx                          # Root route redirect
 │   ├── components/
 │   │   ├── auth/
-│   │   │   └── LoginForm.tsx           # Form with validation, visibility toggle & states
-│   │   ├── dashboard/
-│   │   │   ├── Header.tsx              # Dashboard top header
-│   │   │   ├── MetricCard.tsx          # Reusable placeholder metric card component
-│   │   │   └── Sidebar.tsx             # 8 navigation items with mobile drawer
-│   │   └── ui/
+│   │   │   └── LoginForm.tsx                 # Supabase Auth form with validation & states
+│   │   └── dashboard/
+│   │       ├── Header.tsx                    # Header with sign-out action & admin status
+│   │       ├── MetricCard.tsx                # Reusable placeholder metric card component
+│   │       └── Sidebar.tsx                   # 8 navigation items with sign-out
 │   ├── lib/
-│   │   ├── supabase.ts                 # Supabase client setup (reserved for Phase 2)
-│   │   └── utils.ts                    # Class name utility (clsx + twMerge)
-│   └── types/
-│       └── index.ts                    # TypeScript definitions
-├── .env.example                        # Environment variables template
+│   │   ├── auth/
+│   │   │   └── admin.ts                      # Server-side admin authorization & allowlist
+│   │   ├── supabase/
+│   │   │   ├── client.ts                     # Browser Supabase client
+│   │   │   ├── config.ts                     # Configuration detection & validation
+│   │   │   ├── middleware.ts                 # SSR cookie session update logic
+│   │   │   └── server.ts                     # Server-side Supabase client (cookies)
+│   │   └── utils.ts                          # Class name utility (cn)
+│   ├── types/
+│   │   └── index.ts                          # TypeScript definitions
+│   └── middleware.ts                         # Edge route protection & session refresh
+├── supabase/
+│   ├── migrations/
+│   │   └── 20261026000000_create_admin_authorization.sql
+│   ├── README.md                             # Step-by-step setup guide
+│   └── SCHEMA_BLUEPRINT.md                   # Future database entities blueprint
+├── tests/
+│   └── auth-authorization.test.mjs           # Automated test suite (9 test cases)
+├── .env.example                              # Environment variables template
 ├── .gitignore
 ├── next.config.mjs
 ├── package.json
@@ -86,39 +114,22 @@ c:\sachin to-do-list/
 
 ## Getting Started
 
-### 1. Prerequisites
-- Node.js 18+ (tested on Node.js v20.18.0)
-- npm 9+ (tested on npm 10.8.2)
-
-### 2. Installation
-Dependencies are already installed. If needed on a new machine:
-```bash
-npm install
+### 1. Configuration
+Create `.env.local` using `.env.example` as a template:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-dedicated-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-dedicated-project-anon-key
+ADMIN_EMAIL=sachin.behera@collegevidya.com
 ```
 
-### 3. Environment Variables (Optional in Phase 1)
-Copy the example environment template:
-```bash
-cp .env.example .env.local
+### 2. Running Automated Tests
+```powershell
+npm test
 ```
 
-### 4. Running the Development Server
-```bash
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-- **Login Page**: [http://localhost:3000/login](http://localhost:3000/login)
-- **Dashboard Preview**: [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
-
-### 5. Running the Production Build & Verification
-```bash
-# Type check
+### 3. Type Checking & Production Build
+```powershell
 npm run typecheck
-
-# Production build
 npm run build
-
-# Start production server
 npm run start
 ```

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import Image from "next/image";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Shield, Sparkles, Building2, CheckCircle2 } from "lucide-react";
@@ -97,8 +97,8 @@ export default function LoginPage() {
                   <div className="flex items-start gap-3 p-3 bg-navy-950/60 rounded-xl border border-navy-800">
                     <CheckCircle2 className="w-4 h-4 text-brand-orange mt-0.5 shrink-0" />
                     <div>
-                      <h4 className="text-xs font-semibold text-white">Phase 1 Foundation</h4>
-                      <p className="text-[11px] text-gray-400 mt-0.5">Verified UI components, Next.js 14 & Tailwind.</p>
+                      <h4 className="text-xs font-semibold text-white">Phase 2 Supabase Auth</h4>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Server-enforced single-admin authentication & SSR cookies.</p>
                     </div>
                   </div>
                 </div>
@@ -107,7 +107,15 @@ export default function LoginPage() {
 
             {/* Login Card */}
             <div className="lg:col-span-5 w-full">
-              <LoginForm />
+              <Suspense
+                fallback={
+                  <div className="w-full max-w-md mx-auto bg-navy-900/90 border border-navy-700/80 rounded-2xl p-8 text-center text-gray-400">
+                    Loading login interface...
+                  </div>
+                }
+              >
+                <LoginForm />
+              </Suspense>
             </div>
 
           </div>
