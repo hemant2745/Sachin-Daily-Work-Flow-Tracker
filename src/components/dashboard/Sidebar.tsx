@@ -31,7 +31,7 @@ interface NavItem {
 const navigationItems: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, isImplemented: true },
   { name: "Tasks & Subtasks", href: "/dashboard#tasks", icon: CheckSquare, isImplemented: false },
-  { name: "Counselors", href: "/dashboard#counselors", icon: Users, isImplemented: false },
+  { name: "Counselors", href: "/dashboard/counselors", icon: Users, isImplemented: true },
   { name: "Admissions", href: "/dashboard#admissions", icon: GraduationCap, isImplemented: false },
   { name: "Daily Tracker", href: "/dashboard#tracker", icon: CalendarCheck, isImplemented: false },
   { name: "Projections", href: "/dashboard#projections", icon: TrendingUp, isImplemented: false },
@@ -120,7 +120,10 @@ export function Sidebar() {
           </div>
           {navigationItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || (item.href === "/dashboard" && pathname === "/");
+            const isActive =
+              pathname === item.href ||
+              (item.href === "/dashboard" && pathname === "/") ||
+              (item.href !== "/dashboard" && !item.href.includes("#") && pathname.startsWith(item.href));
 
             return (
               <Link
@@ -158,7 +161,7 @@ export function Sidebar() {
           <div className="flex items-start gap-2">
             <Sparkles className="w-3.5 h-3.5 text-brand-orange mt-0.5 shrink-0" />
             <div className="text-[11px] text-gray-300 leading-snug">
-              <span className="font-semibold text-white">Phase 2 Security:</span> Supabase SSR auth with server-enforced single-admin allowlist.
+              <span className="font-semibold text-white">Phase 3:</span> Counselor Management & Monthly Target Tracking active.
             </div>
           </div>
         </div>

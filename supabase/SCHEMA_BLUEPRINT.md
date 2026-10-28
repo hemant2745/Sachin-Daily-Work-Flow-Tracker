@@ -24,33 +24,34 @@
 
 ---
 
-## 2. Planned for Phase 3: Counselor Management
+## 2. Implemented in Phase 3: Counselor Management & Monthly Targets
 
 ### `public.counselors`
 - `id` (UUID, PK, DEFAULT `gen_random_uuid()`)
-- `employee_id` (TEXT, UNIQUE, NOT NULL)
-- `full_name` (TEXT, NOT NULL)
-- `work_email` (TEXT, NOT NULL)
-- `phone_number` (TEXT)
-- `team_leader_id` (UUID, references `admin_users(id)`)
-- `status` (TEXT, NOT NULL, CHECK: `'active'`, `'inactive'`, `'on_leave'`)
-- `joined_date` (DATE NOT NULL)
-- `created_at` (TIMESTAMPTZ)
-- `updated_at` (TIMESTAMPTZ)
+- `employee_code` (TEXT, UNIQUE, NOT NULL, CHECK: non-empty)
+- `full_name` (TEXT, NOT NULL, CHECK: non-empty)
+- `email` (TEXT, UNIQUE, NOT NULL, normalized lowercase)
+- `phone` (TEXT, NOT NULL, CHECK: non-empty)
+- `monthly_target` (NUMERIC(12,2), NOT NULL, DEFAULT 0.00, CHECK >= 0) -- Base quota
+- `is_active` (BOOLEAN, NOT NULL, DEFAULT true)
+- `created_at` (TIMESTAMPTZ, NOT NULL)
+- `updated_at` (TIMESTAMPTZ, NOT NULL)
+- *RLS*: Enabled. Read/write access strictly restricted to verified administrators via `public.is_admin()`.
+
+### `public.counselor_monthly_targets` (Authoritative Source for Monthly Targets)
+- `id` (UUID, PK, DEFAULT `gen_random_uuid()`)
+- `counselor_id` (UUID, references `counselors(id) ON DELETE RESTRICT`)
+- `target_month` (DATE, NOT NULL) -- Normalized to first day of month (YYYY-MM-01)
+- `target_amount` (NUMERIC(12,2), NOT NULL, DEFAULT 0.00, CHECK >= 0)
+- `created_at` (TIMESTAMPTZ, NOT NULL)
+- `updated_at` (TIMESTAMPTZ, NOT NULL)
+- *Constraint*: `UNIQUE(counselor_id, target_month)`
+- *Foreign Key Rule*: `ON DELETE RESTRICT` (Prevents silent deletion of historical targets)
+- *RLS*: Enabled. Restricted to active administrators via `public.is_admin()`.
 
 ---
 
-## 3. Planned for Phase 4: Monthly Targets & Admissions
-
-### `public.monthly_targets`
-- `id` (UUID, PK, DEFAULT `gen_random_uuid()`)
-- `counselor_id` (UUID, references `counselors(id) ON DELETE CASCADE`)
-- `target_month` (DATE NOT NULL) -- Normalized to 1st of month
-- `target_revenue` (NUMERIC(12,2) NOT NULL DEFAULT 0.00)
-- `target_admissions` (INTEGER NOT NULL DEFAULT 0)
-- `created_at` (TIMESTAMPTZ)
-- `updated_at` (TIMESTAMPTZ)
-- *Constraint*: `UNIQUE(counselor_id, target_month)`
+## 3. Planned for Phase 4: Admissions Pipeline & Verified Collections
 
 ### `public.admissions`
 - `id` (UUID, PK, DEFAULT `gen_random_uuid()`)

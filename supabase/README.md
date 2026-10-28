@@ -36,14 +36,22 @@ This guide details how to configure a brand new, isolated Supabase project for *
 
 ---
 
-## 3. Apply the Phase 2 Migration
+## 3. Apply the Database Migrations
 
+### Migration 1: Phase 2 Admin Authorization
 1. In your Supabase dashboard, click on **SQL Editor** in the left sidebar.
 2. Click **New Query**.
 3. Open and copy the contents of:
    [`supabase/migrations/20261026000000_create_admin_authorization.sql`](./migrations/20261026000000_create_admin_authorization.sql)
 4. Paste into the SQL Editor and click **Run**.
 5. Verify that `public.admin_users` and the `is_admin()` function are created successfully.
+
+### Migration 2: Phase 3 Counselors & Monthly Targets
+1. Click **New Query** in the SQL Editor.
+2. Open and copy the contents of:
+   [`supabase/migrations/20261028000000_create_counselors_and_targets.sql`](./migrations/20261028000000_create_counselors_and_targets.sql)
+3. Paste into the SQL Editor and click **Run**.
+4. Verify that `public.counselors` and `public.counselor_monthly_targets` are created with RLS enabled.
 
 ---
 

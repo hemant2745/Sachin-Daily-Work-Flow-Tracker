@@ -149,28 +149,35 @@ export default function DashboardPage() {
       {/* Visual Preview Modules (Identified clearly as non-implemented UI previews) */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-5 pt-2">
         
-        {/* Counselors Module Preview */}
+        {/* Counselors Module */}
         <div id="counselors" className="bg-white border border-surface-border rounded-xl p-5 shadow-card">
           <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-100">
             <div className="flex items-center space-x-2.5">
               <div className="w-7 h-7 rounded-lg bg-navy-50 flex items-center justify-center text-navy-800">
                 <Users className="w-4 h-4 text-brand-orange" />
               </div>
-              <h4 className="text-sm font-bold text-navy-800">Counselor Management</h4>
+              <h4 className="text-sm font-bold text-navy-800">Counselor Management & Targets</h4>
             </div>
-            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500">
-              Module Preview
+            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Phase 3 Implemented
             </span>
           </div>
 
-          <div className="py-8 px-4 text-center border-2 border-dashed border-gray-200 rounded-lg bg-surface-light/60">
+          <div className="py-6 px-4 text-center border-2 border-dashed border-gray-200 rounded-lg bg-surface-light/60">
             <div className="w-10 h-10 rounded-full bg-white mx-auto flex items-center justify-center shadow-sm text-gray-400 mb-2.5">
-              <Database className="w-5 h-5 text-gray-400" />
+              <Users className="w-5 h-5 text-brand-orange" />
             </div>
-            <p className="text-xs font-semibold text-gray-700">No Counselors Configured</p>
-            <p className="text-[11px] text-gray-500 max-w-sm mx-auto mt-1">
-              Counselors are managed strictly as database records by the administrator. They do not have individual login accounts. Records will be added in Phase 2.
+            <p className="text-xs font-semibold text-gray-700">Counselor Module is Active</p>
+            <p className="text-[11px] text-gray-500 max-w-sm mx-auto mt-1 mb-4">
+              Register counselors, configure month-by-month performance targets, and manage active team rosters in the dedicated section.
             </p>
+            <a
+              href="/dashboard/counselors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-orange hover:bg-brand-hover text-white text-xs font-semibold rounded-lg shadow-sm transition-all"
+            >
+              <span>Manage Counselors & Targets</span>
+              <span aria-hidden="true">&rarr;</span>
+            </a>
           </div>
         </div>
 
