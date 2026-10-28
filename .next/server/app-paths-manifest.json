@@ -1,7 +1,0 @@
-{
-  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
-  "/(dashboard)/dashboard/counselors/page": "app/(dashboard)/dashboard/counselors/page.js",
-  "/(dashboard)/dashboard/admissions/page": "app/(dashboard)/dashboard/admissions/page.js",
-  "/(dashboard)/dashboard/universities/page": "app/(dashboard)/dashboard/universities/page.js",
-  "/(dashboard)/dashboard/daily-tracker/page": "app/(dashboard)/dashboard/daily-tracker/page.js"
-}
