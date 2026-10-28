@@ -21,6 +21,8 @@ import {
   ToggleLeft,
   ToggleRight,
   Database,
+  GraduationCap,
+  RefreshCw,
 } from "lucide-react";
 import {
   formatINR,
@@ -40,6 +42,7 @@ import {
   updateMonthlyTargetAction,
   deleteCounselorAction,
   toggleCounselorStatusAction,
+  importMasterCounselorsAction,
 } from "@/app/(dashboard)/dashboard/counselors/actions";
 
 interface CounselorListProps {
@@ -48,9 +51,12 @@ interface CounselorListProps {
     totalCounselors: number;
     activeCounselors: number;
     combinedMonthlyTarget: number;
+    combinedAdmissionTarget?: number;
     unconfiguredTargetsCount: number;
     teamActualRevenue?: number;
+    teamActualAdmissions?: number;
     teamAchievementPercentage?: number | null;
+    teamAdmissionAchievementPercentage?: number | null;
   };
   initialMonth: string;
   isConfigured: boolean;
@@ -73,7 +79,7 @@ export function CounselorList({
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
-  const [sortBy, setSortBy] = useState<"NAME" | "EMP_CODE">("NAME");
+  const [sortBy, setSortBy] = useState<"NAME" | "EMP_CODE">("EMP_CODE");
   const [sortDirection, setSortDirection] = useState<"ASC" | "DESC">("ASC");
 
   // Modals state
@@ -107,6 +113,26 @@ export function CounselorList({
     });
   };
 
+  // Sync Master Roster Handler
+  const handleSyncMaster = () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    startTransition(async () => {
+      const res = await importMasterCounselorsAction();
+      if (res.success) {
+        setSuccessMessage(res.message || "Master roster synchronized successfully.");
+        const refreshed = await getCounselorsWithTargetsAction(selectedMonth);
+        if (refreshed.success) {
+          setCounselors(refreshed.counselors);
+          setSummary(refreshed.summary);
+        }
+      } else {
+        setErrorMessage(res.error || "Failed to synchronize master roster.");
+      }
+    });
+  };
+
   // Filtered & Sorted Counselors
   const filteredCounselors = useMemo(() => {
     let list = [...counselors];
@@ -125,8 +151,8 @@ export function CounselorList({
         (c) =>
           c.full_name.toLowerCase().includes(q) ||
           c.employee_code.toLowerCase().includes(q) ||
-          c.email.toLowerCase().includes(q) ||
-          c.phone.includes(q)
+          (c.email && c.email.toLowerCase().includes(q)) ||
+          (c.phone && c.phone.includes(q))
       );
     }
 
@@ -163,10 +189,16 @@ export function CounselorList({
     }
   };
 
-  const handleSaveTarget = async (counselorId: string, month: string, amount: number) => {
-    const res = await updateMonthlyTargetAction(counselorId, month, amount);
+  const handleSaveTarget = async (
+    counselorId: string,
+    month: string,
+    amount: number,
+    admissions: number = 0,
+    notes?: string
+  ) => {
+    const res = await updateMonthlyTargetAction(counselorId, month, amount, admissions, notes);
     if (res.success) {
-      setSuccessMessage(`Target for ${formatMonthDisplay(month)} updated successfully.`);
+      setSuccessMessage(`Targets for ${formatMonthDisplay(month)} updated successfully.`);
       handleMonthChange(selectedMonth);
     }
     return res;
@@ -203,7 +235,7 @@ export function CounselorList({
             Counselor Management & Targets
           </h2>
           <p className="text-xs text-gray-500 mt-1">
-            Private management console for Sachin Behera. Counselors are managed as records without login access.
+            Private management console for Sachin Behera. Counselors are managed as records without individual login accounts.
           </p>
         </div>
 
@@ -225,13 +257,24 @@ export function CounselorList({
             </select>
           </div>
 
+          {/* Sync 9 Master Counselors Button */}
+          <button
+            onClick={handleSyncMaster}
+            disabled={isPending}
+            className="inline-flex items-center gap-1.5 bg-navy-900 hover:bg-navy-800 text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-navy-700 disabled:opacity-50"
+            title="Synchronize/Import the 9 authorized team counselors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-brand-orange ${isPending ? "animate-spin" : ""}`} />
+            <span>Sync Master Roster</span>
+          </button>
+
           {/* Add Counselor Button */}
           <button
             onClick={() => {
               setEditingCounselor(null);
               setIsCounselorModalOpen(true);
             }}
-            className="flex items-center gap-1.5 bg-brand-orange hover:bg-brand-hover text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-sm transition-all shrink-0"
+            className="inline-flex items-center gap-1.5 bg-brand-orange hover:bg-brand-hover text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-brand-orange"
           >
             <Plus className="w-4 h-4" />
             <span>Add Counselor</span>
@@ -245,7 +288,7 @@ export function CounselorList({
           <Database className="w-5 h-5 text-brand-orange mt-0.5 shrink-0" />
           <div className="text-xs text-amber-900 leading-relaxed">
             <span className="font-bold text-amber-950">Remote Supabase Database Setup Required: </span>
-            Local application components, validations, and routes are fully operational. Once you configure your new dedicated Supabase credentials in <code className="bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-semibold">.env.local</code> and run the migration in <code className="bg-amber-100 px-1 py-0.5 rounded text-amber-950">supabase/migrations/20261028000000_create_counselors_and_targets.sql</code>, live records will persist directly to your PostgreSQL database.
+            Ensure your Supabase project credentials in <code className="bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-semibold">.env.local</code> and migrations are applied.
           </div>
         </div>
       )}
@@ -276,84 +319,116 @@ export function CounselorList({
         </div>
       )}
 
-      {/* Summary Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Summary Metrics Row (6 Comprehensive Cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
         {/* Total Counselors */}
-        <div className="bg-white border border-surface-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Total Counselors
+        <div className="bg-white border border-surface-border rounded-xl p-3.5 shadow-card">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Counselors
             </span>
-            <div className="w-8 h-8 rounded-lg bg-navy-50 text-navy-800 flex items-center justify-center">
-              <Users className="w-4 h-4 text-brand-orange" />
+            <div className="w-7 h-7 rounded-lg bg-navy-50 text-navy-800 flex items-center justify-center">
+              <Users className="w-3.5 h-3.5 text-brand-orange" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-navy-800">{summary.totalCounselors}</div>
-          <p className="text-[11px] text-gray-500 mt-1">Total registered counselor records</p>
+          <div className="text-xl font-bold text-navy-800">{summary.totalCounselors}</div>
+          <p className="text-[10px] text-gray-500 mt-0.5">{summary.activeCounselors} active roster</p>
         </div>
 
-        {/* Active Counselors */}
-        <div className="bg-white border border-surface-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Active Counselors
+        {/* Team Collection Target */}
+        <div className="bg-white border border-surface-border rounded-xl p-3.5 shadow-card">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Collection Target
             </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <UserCheck className="w-4 h-4 text-emerald-600" />
+            <div className="w-7 h-7 rounded-lg bg-navy-50 text-navy-800 flex items-center justify-center">
+              <Target className="w-3.5 h-3.5 text-brand-orange" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-navy-800">{summary.activeCounselors}</div>
-          <p className="text-[11px] text-gray-500 mt-1">
-            {summary.totalCounselors - summary.activeCounselors} inactive records preserved
-          </p>
-        </div>
-
-        {/* Combined Monthly Target */}
-        <div className="bg-white border border-surface-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Team Target ({formatMonthDisplay(selectedMonth)})
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-navy-50 text-navy-800 flex items-center justify-center">
-              <Target className="w-4 h-4 text-brand-orange" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-navy-800">
+          <div className="text-xl font-bold text-navy-800">
             {formatINR(summary.combinedMonthlyTarget)}
           </div>
-          <p className="text-[11px] text-gray-500 mt-1">
-            {summary.unconfiguredTargetsCount > 0 ? (
-              <span className="text-amber-600 font-medium">
-                {summary.unconfiguredTargetsCount} active counselor(s) with ₹0 target
+          <p className="text-[10px] text-gray-500 mt-0.5">Sum of active quotas</p>
+        </div>
+
+        {/* Team Admission Target */}
+        <div className="bg-white border border-surface-border rounded-xl p-3.5 shadow-card">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Admission Target
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-navy-50 text-navy-800 flex items-center justify-center">
+              <GraduationCap className="w-3.5 h-3.5 text-brand-orange" />
+            </div>
+          </div>
+          <div className="text-xl font-bold text-navy-800">
+            {summary.combinedAdmissionTarget ?? 0}
+          </div>
+          <p className="text-[10px] text-gray-500 mt-0.5">Enrolled student quota</p>
+        </div>
+
+        {/* Team Actual Collections */}
+        <div className="bg-white border border-surface-border rounded-xl p-3.5 shadow-card">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Actual Collections
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+              <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+            </div>
+          </div>
+          <div className="text-xl font-bold text-navy-800">
+            {formatINR(summary.teamActualRevenue || 0)}
+          </div>
+          <p className="text-[10px] text-gray-500 mt-0.5">
+            {summary.teamAchievementPercentage !== null && summary.teamAchievementPercentage !== undefined ? (
+              <span className="text-emerald-600 font-medium">
+                {summary.teamAchievementPercentage.toFixed(2)}% achieved
               </span>
             ) : (
-              <span>Sum of all active counselor targets</span>
+              <span>₹0 verified collections</span>
             )}
           </p>
         </div>
 
-        {/* Combined Actual Revenue */}
-        <div className="bg-white border border-surface-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Team Actual Revenue
+        {/* Team Actual Admissions */}
+        <div className="bg-white border border-surface-border rounded-xl p-3.5 shadow-card">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Actual Admissions
             </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <DollarSign className="w-4 h-4 text-emerald-600" />
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+              <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-navy-800">
-            {formatINR(summary.teamActualRevenue || 0)}
+          <div className="text-xl font-bold text-navy-800">
+            {summary.teamActualAdmissions ?? 0}
           </div>
-          <p className="text-[11px] text-gray-500 mt-1">
-            {summary.teamAchievementPercentage !== null && summary.teamAchievementPercentage !== undefined ? (
-              <span className="text-emerald-600 font-medium">
-                {summary.teamAchievementPercentage.toFixed(1)}% of monthly target achieved
+          <p className="text-[10px] text-gray-500 mt-0.5">
+            {summary.teamAdmissionAchievementPercentage !== null && summary.teamAdmissionAchievementPercentage !== undefined ? (
+              <span className="text-blue-600 font-medium">
+                {summary.teamAdmissionAchievementPercentage.toFixed(2)}% achieved
               </span>
             ) : (
-              <span>Verified collections for {formatMonthDisplay(selectedMonth)}</span>
+              <span>0 admissions recorded</span>
             )}
           </p>
+        </div>
+
+        {/* Overall Progress Status */}
+        <div className="bg-white border border-surface-border rounded-xl p-3.5 shadow-card">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Period
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-orange-50 text-brand-orange flex items-center justify-center">
+              <Calendar className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div className="text-sm font-bold text-navy-800 truncate">
+            {formatMonthDisplay(selectedMonth)}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">Active reporting cycle</p>
         </div>
       </div>
 
@@ -367,42 +442,42 @@ export function CounselorList({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by counselor name, code, email, or phone..."
-              className="w-full pl-9 pr-3 py-2 bg-surface-light border border-gray-200 rounded-lg text-xs text-navy-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange"
+              placeholder="Search by counselor name, code, contact..."
+              className="w-full pl-9 pr-3 py-2 text-xs bg-surface-light border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-orange focus:bg-white transition-all"
             />
           </div>
 
           {/* Filters & Sorting */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center space-x-2">
             {/* Status Filter */}
-            <div className="inline-flex rounded-lg bg-surface-light p-1 border border-gray-200 text-xs">
-              <button
-                onClick={() => setStatusFilter("ALL")}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
-                  statusFilter === "ALL" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-800"
-                }`}
-              >
-                All ({counselors.length})
-              </button>
-              <button
-                onClick={() => setStatusFilter("ACTIVE")}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
-                  statusFilter === "ACTIVE" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-800"
-                }`}
-              >
-                Active ({summary.activeCounselors})
-              </button>
-              <button
-                onClick={() => setStatusFilter("INACTIVE")}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
-                  statusFilter === "INACTIVE" ? "bg-white text-navy-800 shadow-sm" : "text-gray-500 hover:text-navy-800"
-                }`}
-              >
-                Inactive ({summary.totalCounselors - summary.activeCounselors})
-              </button>
-            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="px-2.5 py-1.5 text-xs font-semibold text-navy-800 bg-surface-light hover:bg-gray-100 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-orange cursor-pointer"
+            >
+              <option value="ALL">All Status</option>
+              <option value="ACTIVE">Active Only</option>
+              <option value="INACTIVE">Inactive Only</option>
+            </select>
 
-            {/* Sort Toggle */}
+            {/* Sort Toggle: Employee Code */}
+            <button
+              onClick={() => {
+                if (sortBy === "EMP_CODE") {
+                  setSortDirection(sortDirection === "ASC" ? "DESC" : "ASC");
+                } else {
+                  setSortBy("EMP_CODE");
+                  setSortDirection("ASC");
+                }
+              }}
+              className="px-2.5 py-1.5 bg-surface-light hover:bg-gray-100 text-xs font-semibold text-navy-800 rounded-lg border border-gray-200 flex items-center gap-1.5 transition-colors"
+              title="Toggle Sort by Employee Code"
+            >
+              <ArrowUpDown className="w-3.5 h-3.5 text-brand-orange" />
+              <span>Code {sortBy === "EMP_CODE" && (sortDirection === "ASC" ? "↑" : "↓")}</span>
+            </button>
+
+            {/* Sort Toggle: Name */}
             <button
               onClick={() => {
                 if (sortBy === "NAME") {
@@ -434,20 +509,29 @@ export function CounselorList({
             </h4>
             <p className="text-xs text-gray-500 max-w-sm mx-auto mt-1 leading-relaxed">
               {counselors.length === 0
-                ? "Start building your team by registering counselor records using the button below."
+                ? "Click 'Sync Master Roster' to import the nine authorized team counselors automatically."
                 : "Try clearing your search query or status filter to view all counselors."}
             </p>
             {counselors.length === 0 && (
-              <button
-                onClick={() => {
-                  setEditingCounselor(null);
-                  setIsCounselorModalOpen(true);
-                }}
-                className="mt-4 inline-flex items-center gap-1.5 bg-brand-orange hover:bg-brand-hover text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add First Counselor</span>
-              </button>
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <button
+                  onClick={handleSyncMaster}
+                  className="inline-flex items-center gap-1.5 bg-navy-900 hover:bg-navy-800 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-all"
+                >
+                  <RefreshCw className="w-4 h-4 text-brand-orange" />
+                  <span>Sync 9 Master Counselors</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingCounselor(null);
+                    setIsCounselorModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 bg-brand-orange hover:bg-brand-hover text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add First Counselor</span>
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -455,20 +539,22 @@ export function CounselorList({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-navy-950 text-white text-[11px] uppercase tracking-wider font-semibold border-b border-navy-800">
-                  <th className="py-3 px-4">Counselor</th>
-                  <th className="py-3 px-4">Contact</th>
-                  <th className="py-3 px-4 text-right">
-                    Target ({formatMonthDisplay(selectedMonth)})
-                  </th>
-                  <th className="py-3 px-4 text-right">Actual Revenue</th>
-                  <th className="py-3 px-4 text-center">Achievement</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-3.5">Counselor</th>
+                  <th className="py-3 px-3.5">Contact</th>
+                  <th className="py-3 px-3.5 text-right">Collection Target</th>
+                  <th className="py-3 px-3 text-center">Adm. Target</th>
+                  <th className="py-3 px-3.5 text-right">Actual Collections</th>
+                  <th className="py-3 px-3 text-center">Actual Adm.</th>
+                  <th className="py-3 px-3 text-center">Collection Ach. %</th>
+                  <th className="py-3 px-3 text-center">Adm. Ach. %</th>
+                  <th className="py-3 px-3 text-center">Status</th>
+                  <th className="py-3 px-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-xs">
                 {filteredCounselors.map((c) => {
-                  const achievement = calculateAchievement(c.actual_revenue, c.effective_target);
+                  const collectionAchievement = calculateAchievement(c.actual_revenue, c.effective_target, 2);
+                  const admissionAchievement = calculateAchievement(c.actual_admissions, c.effective_admission_target, 2);
 
                   return (
                     <tr
@@ -478,7 +564,7 @@ export function CounselorList({
                       }`}
                     >
                       {/* Name & Emp Code */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-3.5">
                         <div className="flex items-center space-x-2.5">
                           <div className="w-7 h-7 rounded-full bg-navy-100 text-navy-800 flex items-center justify-center font-bold text-[11px] shrink-0">
                             {c.full_name.charAt(0)}
@@ -493,61 +579,127 @@ export function CounselorList({
                       </td>
 
                       {/* Contact Info */}
-                      <td className="py-3.5 px-4">
-                        <div className="text-gray-700">{c.email}</div>
-                        <div className="text-[11px] text-gray-400">{c.phone}</div>
+                      <td className="py-3 px-3.5">
+                        <div className="text-gray-700 text-[11px]">{c.email || "No email on record"}</div>
+                        <div className="text-[10px] text-gray-400">{c.phone || "No phone on record"}</div>
                       </td>
 
-                      {/* Monthly Target for Selected Month */}
-                      <td className="py-3.5 px-4 text-right font-semibold text-navy-800">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span>{formatINR(c.effective_target)}</span>
-                          <button
-                            onClick={() => {
-                              setTargetModalCounselor(c);
-                              setIsTargetModalOpen(true);
-                            }}
-                            className="p-1 rounded text-gray-400 hover:text-brand-orange hover:bg-orange-50 transition-colors"
-                            title={`Edit target specifically for ${formatMonthDisplay(selectedMonth)}`}
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                        {c.has_custom_target ? (
-                          <div className="text-[10px] text-brand-orange font-normal">Month custom</div>
+                      {/* Collection Target for Selected Month */}
+                      <td className="py-3 px-3.5 text-right font-semibold text-navy-800">
+                        {c.is_target_assigned ? (
+                          <>
+                            <div className="flex items-center justify-end gap-1">
+                              <span>{formatINR(c.effective_target)}</span>
+                              <button
+                                onClick={() => {
+                                  setTargetModalCounselor(c);
+                                  setIsTargetModalOpen(true);
+                                }}
+                                className="p-1 rounded text-gray-400 hover:text-brand-orange hover:bg-orange-50 transition-colors"
+                                title={`Revise targets specifically for ${formatMonthDisplay(selectedMonth)}`}
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <div className="text-[10px] text-emerald-600 font-normal">Assigned</div>
+                          </>
                         ) : (
-                          <div className="text-[10px] text-gray-400 font-normal">Base quota</div>
+                          <div className="flex flex-col items-end">
+                            <button
+                              onClick={() => {
+                                setTargetModalCounselor(c);
+                                setIsTargetModalOpen(true);
+                              }}
+                              className="text-xs text-amber-700 hover:text-brand-orange hover:underline font-medium flex items-center gap-1"
+                            >
+                              <span>Assign Target</span>
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <span className="text-[10px] text-gray-400 font-normal">
+                              Suggested: {formatINR(c.monthly_target)}
+                            </span>
+                          </div>
                         )}
                       </td>
 
-                      {/* Actual Revenue */}
-                      <td className="py-3.5 px-4 text-right font-semibold text-navy-800">
+                      {/* Admission Target for Selected Month */}
+                      <td className="py-3 px-3 text-center font-semibold text-navy-800">
+                        {c.is_target_assigned ? (
+                          <>
+                            <div>{c.effective_admission_target}</div>
+                            <div className="text-[9px] text-emerald-600 font-normal">Assigned</div>
+                          </>
+                        ) : (
+                          <div>
+                            <span className="text-gray-400 text-xs">-</span>
+                            <div className="text-[9px] text-gray-400 font-normal">
+                              Suggested: {c.monthly_admission_target || 6}
+                            </div>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Actual Collections */}
+                      <td className="py-3 px-3.5 text-right font-semibold text-navy-800">
                         <div>{formatINR(c.actual_revenue || 0)}</div>
                         <div className="text-[10px] text-gray-400 font-normal">
-                          {c.actual_revenue && c.actual_revenue > 0 ? "Verified collections" : "₹0 recorded"}
+                          {c.actual_revenue && c.actual_revenue > 0 ? "Verified" : "₹0 recorded"}
                         </div>
                       </td>
 
-                      {/* Achievement % */}
-                      <td className="py-3.5 px-4 text-center">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium ${
-                            achievement.status === "CALCULATED"
-                              ? (achievement.percentage || 0) >= 100
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : "bg-blue-50 text-blue-700 border border-blue-200"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {achievement.display}
-                        </span>
+                      {/* Actual Admissions */}
+                      <td className="py-3 px-3 text-center font-semibold text-navy-800">
+                        <div>{c.actual_admissions ?? 0}</div>
+                        <div className="text-[9px] text-gray-400 font-normal">Enrolled</div>
+                      </td>
+
+                      {/* Collection Achievement % */}
+                      <td className="py-3 px-3 text-center">
+                        {c.is_target_assigned ? (
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                              collectionAchievement.status === "CALCULATED"
+                                ? (collectionAchievement.percentage || 0) >= 100
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : (collectionAchievement.percentage || 0) > 0
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : "bg-gray-100 text-gray-600"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {collectionAchievement.display}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-amber-700 italic">Target not assigned</span>
+                        )}
+                      </td>
+
+                      {/* Admission Achievement % */}
+                      <td className="py-3 px-3 text-center">
+                        {c.is_target_assigned ? (
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                              admissionAchievement.status === "CALCULATED"
+                                ? (admissionAchievement.percentage || 0) >= 100
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : (admissionAchievement.percentage || 0) > 0
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : "bg-gray-100 text-gray-600"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {admissionAchievement.display}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-amber-700 italic">Target not assigned</span>
+                        )}
                       </td>
 
                       {/* Status Badge */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3 px-3 text-center">
                         <button
                           onClick={() => handleToggleStatus(c)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
                             c.is_active
                               ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
                               : "bg-gray-100 text-gray-500 border border-gray-300 hover:bg-gray-200"
@@ -564,8 +716,8 @@ export function CounselorList({
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end space-x-1.5">
+                      <td className="py-3 px-3.5 text-right">
+                        <div className="flex items-center justify-end space-x-1">
                           {/* Edit Details */}
                           <button
                             onClick={() => {
@@ -600,27 +752,36 @@ export function CounselorList({
         )}
       </div>
 
-      {/* Counselor Add/Edit Modal */}
+      {/* Counselor Add / Edit Modal */}
       <CounselorModal
         isOpen={isCounselorModalOpen}
-        onClose={() => setIsCounselorModalOpen(false)}
-        onSubmit={handleSaveCounselor}
+        onClose={() => {
+          setIsCounselorModalOpen(false);
+          setEditingCounselor(null);
+        }}
         counselor={editingCounselor}
+        onSubmit={handleSaveCounselor}
       />
 
-      {/* Target Modal for Specific Month */}
+      {/* Target Setting Modal */}
       <TargetModal
         isOpen={isTargetModalOpen}
-        onClose={() => setIsTargetModalOpen(false)}
+        onClose={() => {
+          setIsTargetModalOpen(false);
+          setTargetModalCounselor(null);
+        }}
         counselor={targetModalCounselor}
         selectedMonth={selectedMonth}
         onSaveTarget={handleSaveTarget}
       />
 
-      {/* Delete / Deactivate Modal */}
+      {/* Delete / Deactivate Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeletingCounselor(null);
+        }}
         counselor={deletingCounselor}
         onConfirmDelete={handleDeleteCounselor}
       />

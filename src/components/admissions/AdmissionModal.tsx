@@ -5,6 +5,7 @@ import { X, AlertCircle, DollarSign, Calendar, GraduationCap, Building2, User, F
 import { formatINR, validateAdmissionInput } from "@/lib/format";
 import type { AdmissionWithCounselor, AdmissionFormData, PaymentMode } from "@/types/admissions";
 import { PAYMENT_MODE_LABELS } from "@/types/admissions";
+import { UNIVERSITY_NAMES } from "@/lib/constants/universities";
 
 interface CounselorOption {
   id: string;
@@ -247,14 +248,24 @@ export function AdmissionModal({
                 <input
                   type="text"
                   name="university_name"
+                  list="university-master-list"
                   value={formData.university_name}
                   onChange={handleChange}
-                  placeholder="e.g. Chandigarh University"
+                  placeholder="Select or enter university name"
                   className={`w-full pl-9 pr-3 py-2 text-xs bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-orange transition-all ${
                     errors.university_name ? "border-red-500" : "border-gray-200"
                   }`}
+                  autoComplete="off"
                 />
+                <datalist id="university-master-list">
+                  {UNIVERSITY_NAMES.map((uni) => (
+                    <option key={uni} value={uni} />
+                  ))}
+                </datalist>
               </div>
+              <p className="text-[10px] text-gray-400 mt-1">
+                Choose from the 23 master universities or type a custom name.
+              </p>
               {errors.university_name && (
                 <p className="text-[11px] text-red-600 mt-1">{errors.university_name}</p>
               )}

@@ -8,6 +8,7 @@ import {
   CheckSquare,
   Users,
   GraduationCap,
+  Building2,
   CalendarCheck,
   TrendingUp,
   BarChart3,
@@ -30,10 +31,11 @@ interface NavItem {
 
 const navigationItems: NavItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, isImplemented: true },
-  { name: "Tasks & Subtasks", href: "/dashboard#tasks", icon: CheckSquare, isImplemented: false },
   { name: "Counselors", href: "/dashboard/counselors", icon: Users, isImplemented: true },
   { name: "Admissions", href: "/dashboard/admissions", icon: GraduationCap, isImplemented: true },
-  { name: "Daily Tracker", href: "/dashboard#tracker", icon: CalendarCheck, isImplemented: false },
+  { name: "Universities", href: "/dashboard/universities", icon: Building2, isImplemented: true },
+  { name: "Tasks & Subtasks", href: "/dashboard#tasks", icon: CheckSquare, isImplemented: false },
+  { name: "Daily Tracker", href: "/dashboard/daily-tracker", icon: CalendarCheck, isImplemented: true },
   { name: "Projections", href: "/dashboard#projections", icon: TrendingUp, isImplemented: false },
   { name: "Reports", href: "/dashboard#reports", icon: BarChart3, isImplemented: false },
   { name: "Settings", href: "/dashboard#settings", icon: Settings, isImplemented: false },

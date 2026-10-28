@@ -4,14 +4,16 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { evaluateSessionAccess } from "@/lib/auth/admin";
-import { validateCounselorInput, normalizeMonthKey, getMonthDateRange } from "@/lib/format";
+import { validateCounselorInput, normalizeMonthKey, getMonthDateRange, formatMonthDisplay } from "@/lib/format";
 import type {
   Counselor,
   CounselorMonthlyTarget,
   CounselorWithTarget,
+  CounselorSummary,
   CounselorFormData,
   CounselorActionResponse,
 } from "@/types/counselor";
+import { AUTHORIZED_MASTER_COUNSELORS } from "@/lib/constants/counselors";
 
 /**
  * Ensures caller is an authorized administrator before executing server action
@@ -61,20 +63,13 @@ async function verifyAdminAuth() {
 }
 
 /**
- * Fetches all counselors merged with their month-specific targets for a selected month
+ * Fetches all counselors merged with their month-specific collection and admission targets
  */
 export async function getCounselorsWithTargetsAction(monthKey: string): Promise<{
   success: boolean;
   isConfigured: boolean;
   counselors: CounselorWithTarget[];
-  summary: {
-    totalCounselors: number;
-    activeCounselors: number;
-    combinedMonthlyTarget: number;
-    unconfiguredTargetsCount: number;
-    teamActualRevenue: number;
-    teamAchievementPercentage: number | null;
-  };
+  summary: CounselorSummary;
   error?: string;
 }> {
   const normalizedMonth = normalizeMonthKey(monthKey);
@@ -89,9 +84,12 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
         totalCounselors: 0,
         activeCounselors: 0,
         combinedMonthlyTarget: 0,
+        combinedAdmissionTarget: 0,
         unconfiguredTargetsCount: 0,
         teamActualRevenue: 0,
+        teamActualAdmissions: 0,
         teamAchievementPercentage: null,
+        teamAdmissionAchievementPercentage: null,
       },
       error: auth.error,
     };
@@ -104,7 +102,7 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
     const { data: counselorsData, error: counselorsError } = await supabase
       .from("counselors")
       .select("*")
-      .order("full_name", { ascending: true });
+      .order("employee_code", { ascending: true });
 
     if (counselorsError) {
       return {
@@ -115,9 +113,12 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
           totalCounselors: 0,
           activeCounselors: 0,
           combinedMonthlyTarget: 0,
+          combinedAdmissionTarget: 0,
           unconfiguredTargetsCount: 0,
           teamActualRevenue: 0,
+          teamActualAdmissions: 0,
           teamAchievementPercentage: null,
+          teamAdmissionAchievementPercentage: null,
         },
         error: "Failed to fetch counselors: " + counselorsError.message,
       };
@@ -126,37 +127,41 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
     const counselors: Counselor[] = (counselorsData || []).map((c: any) => ({
       ...c,
       monthly_target: Number(c.monthly_target) || 0,
+      monthly_admission_target: Number(c.monthly_admission_target) || 0,
     }));
 
     // 2. Fetch targets for selected month
     const { data: targetsData, error: targetsError } = await supabase
       .from("counselor_monthly_targets")
-      .select("*")
+      .select("counselor_id, target_amount, target_admissions, notes, updated_at, updated_by_email, is_explicitly_assigned")
       .eq("target_month", normalizedMonth);
 
-    if (targetsError) {
-      return {
-        success: false,
-        isConfigured: true,
-        counselors: [],
-        summary: {
-          totalCounselors: 0,
-          activeCounselors: 0,
-          combinedMonthlyTarget: 0,
-          unconfiguredTargetsCount: 0,
-          teamActualRevenue: 0,
-          teamAchievementPercentage: null,
-        },
-        error: "Failed to fetch monthly targets: " + targetsError.message,
-      };
+    const targetsMap = new Map<
+      string,
+      {
+        amount: number;
+        admissions: number;
+        isAssigned: boolean;
+        notes?: string | null;
+        updated_at?: string | null;
+        updated_by_email?: string | null;
+      }
+    >();
+
+    if (!targetsError && targetsData) {
+      targetsData.forEach((t: any) => {
+        targetsMap.set(t.counselor_id, {
+          amount: Number(t.target_amount) || 0,
+          admissions: Number(t.target_admissions) || 0,
+          isAssigned: Boolean(t.is_explicitly_assigned ?? true),
+          notes: t.notes || null,
+          updated_at: t.updated_at || null,
+          updated_by_email: t.updated_by_email || null,
+        });
+      });
     }
 
-    const targetsMap = new Map<string, number>();
-    (targetsData || []).forEach((t: any) => {
-      targetsMap.set(t.counselor_id, Number(t.target_amount) || 0);
-    });
-
-    // 3. Fetch admissions for selected month to calculate actual revenue
+    // 3. Fetch admissions for selected month to calculate actual revenue and admission counts
     const { startDate: monthStart, endDate: monthEnd } = getMonthDateRange(normalizedMonth);
     const { data: admissionsData, error: admissionsError } = await supabase
       .from("admissions")
@@ -164,47 +169,92 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
       .gte("admission_date", monthStart)
       .lte("admission_date", monthEnd);
 
-    // If admissions table doesn't exist yet (e.g. migration pending), default gracefully
     const revenueMap = new Map<string, number>();
+    const admissionsCountMap = new Map<string, number>();
     if (!admissionsError && admissionsData) {
       admissionsData.forEach((a: any) => {
-        const currentVal = revenueMap.get(a.counselor_id) || 0;
-        revenueMap.set(a.counselor_id, currentVal + (Number(a.amount_collected) || 0));
+        const currentRev = revenueMap.get(a.counselor_id) || 0;
+        revenueMap.set(a.counselor_id, currentRev + (Number(a.amount_collected) || 0));
+
+        const currentCount = admissionsCountMap.get(a.counselor_id) || 0;
+        admissionsCountMap.set(a.counselor_id, currentCount + 1);
       });
     }
 
-    // 4. Merge counselors with month-specific target & actual revenue
+    // 4. Merge counselors with month-specific target & actual metrics
     let activeCounselorsCount = 0;
+    let assignedCount = 0;
     let combinedMonthlyTarget = 0;
+    let combinedAdmissionTarget = 0;
     let unconfiguredTargetsCount = 0;
     let teamActualRevenue = 0;
+    let teamActualAdmissions = 0;
 
     const mergedCounselors: CounselorWithTarget[] = counselors.map((c) => {
-      const hasCustomTarget = targetsMap.has(c.id);
-      const effectiveTarget = hasCustomTarget ? targetsMap.get(c.id)! : c.monthly_target;
+      const targetRecord = targetsMap.get(c.id);
+      const isTargetAssigned = Boolean(targetRecord && targetRecord.isAssigned);
+
+      // Explicit target takes precedence; if not assigned, effective target is 0 and marked unassigned
+      const effectiveTarget = isTargetAssigned ? targetRecord!.amount : 0;
+      const effectiveAdmissionTarget = isTargetAssigned ? targetRecord!.admissions : 0;
+
       const actualRevenue = revenueMap.get(c.id) || 0;
-      const achievement = effectiveTarget > 0 ? (actualRevenue / effectiveTarget) * 100 : null;
+      const actualAdmissions = admissionsCountMap.get(c.id) || 0;
+
+      const achievement =
+        isTargetAssigned && effectiveTarget > 0 ? (actualRevenue / effectiveTarget) * 100 : null;
+      const admissionAchievement =
+        isTargetAssigned && effectiveAdmissionTarget > 0
+          ? (actualAdmissions / effectiveAdmissionTarget) * 100
+          : null;
 
       if (c.is_active) {
         activeCounselorsCount++;
-        combinedMonthlyTarget += effectiveTarget;
-        teamActualRevenue += actualRevenue;
-        if (effectiveTarget <= 0) {
+        if (isTargetAssigned) {
+          assignedCount++;
+          combinedMonthlyTarget += effectiveTarget;
+          combinedAdmissionTarget += effectiveAdmissionTarget;
+        } else {
           unconfiguredTargetsCount++;
         }
+        teamActualRevenue += actualRevenue;
+        teamActualAdmissions += actualAdmissions;
       }
 
       return {
         ...c,
         effective_target: effectiveTarget,
-        has_custom_target: hasCustomTarget,
+        effective_admission_target: effectiveAdmissionTarget,
+        has_custom_target: isTargetAssigned,
+        has_custom_admission_target: isTargetAssigned && effectiveAdmissionTarget > 0,
+        is_target_assigned: isTargetAssigned,
+        assigned_notes: targetRecord?.notes || null,
+        target_updated_at: targetRecord?.updated_at || null,
+        target_updated_by: targetRecord?.updated_by_email || null,
         actual_revenue: actualRevenue,
+        actual_admissions: actualAdmissions,
         achievement_percentage: achievement,
+        admission_achievement_percentage: admissionAchievement,
       };
     });
 
+    let targetsAssignmentState: "all_assigned" | "partially_assigned" | "unassigned" = "unassigned";
+    if (activeCounselorsCount > 0 && assignedCount === activeCounselorsCount) {
+      targetsAssignmentState = "all_assigned";
+    } else if (assignedCount > 0) {
+      targetsAssignmentState = "partially_assigned";
+    } else {
+      targetsAssignmentState = "unassigned";
+    }
+
     const teamAchievementPercentage =
-      combinedMonthlyTarget > 0 ? (teamActualRevenue / combinedMonthlyTarget) * 100 : null;
+      assignedCount > 0 && combinedMonthlyTarget > 0
+        ? (teamActualRevenue / combinedMonthlyTarget) * 100
+        : null;
+    const teamAdmissionAchievementPercentage =
+      assignedCount > 0 && combinedAdmissionTarget > 0
+        ? (teamActualAdmissions / combinedAdmissionTarget) * 100
+        : null;
 
     return {
       success: true,
@@ -214,9 +264,14 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
         totalCounselors: counselors.length,
         activeCounselors: activeCounselorsCount,
         combinedMonthlyTarget,
+        combinedAdmissionTarget,
         unconfiguredTargetsCount,
         teamActualRevenue,
+        teamActualAdmissions,
         teamAchievementPercentage,
+        teamAdmissionAchievementPercentage,
+        targetsAssignmentState,
+        assignedCount,
       },
     };
   } catch (err: any) {
@@ -228,9 +283,12 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
         totalCounselors: 0,
         activeCounselors: 0,
         combinedMonthlyTarget: 0,
+        combinedAdmissionTarget: 0,
         unconfiguredTargetsCount: 0,
         teamActualRevenue: 0,
+        teamActualAdmissions: 0,
         teamAchievementPercentage: null,
+        teamAdmissionAchievementPercentage: null,
       },
       error: "Unexpected error reading counselor records: " + (err?.message || "Unknown error"),
     };
@@ -258,21 +316,25 @@ export async function createCounselorAction(
   const supabase = auth.supabase;
   const normalizedEmployeeCode = formData.employee_code.trim().toUpperCase();
   const normalizedFullName = formData.full_name.trim();
-  const normalizedEmail = formData.email.trim().toLowerCase();
-  const normalizedPhone = formData.phone.trim();
+  const normalizedEmail = formData.email?.trim().toLowerCase() || null;
+  const normalizedPhone = formData.phone?.trim() || null;
   const monthlyTarget = Math.max(0, Number(formData.monthly_target) || 0);
+  const monthlyAdmissionTarget = Math.max(0, Number(formData.monthly_admission_target) || 0);
 
   try {
+    const insertPayload: any = {
+      employee_code: normalizedEmployeeCode,
+      full_name: normalizedFullName,
+      monthly_target: monthlyTarget,
+      monthly_admission_target: monthlyAdmissionTarget,
+      is_active: formData.is_active ?? true,
+    };
+    if (normalizedEmail) insertPayload.email = normalizedEmail;
+    if (normalizedPhone) insertPayload.phone = normalizedPhone;
+
     const { data: newCounselor, error: insertError } = await supabase
       .from("counselors")
-      .insert({
-        employee_code: normalizedEmployeeCode,
-        full_name: normalizedFullName,
-        email: normalizedEmail,
-        phone: normalizedPhone,
-        monthly_target: monthlyTarget,
-        is_active: formData.is_active ?? true,
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
@@ -299,37 +361,38 @@ export async function createCounselorAction(
     }
 
     // Optionally set initial monthly target for current month
-    if (currentMonthKey && monthlyTarget > 0) {
+    if (currentMonthKey && (monthlyTarget > 0 || monthlyAdmissionTarget > 0)) {
       const monthDate = normalizeMonthKey(currentMonthKey);
       await supabase.from("counselor_monthly_targets").upsert(
         {
           counselor_id: newCounselor.id,
           target_month: monthDate,
           target_amount: monthlyTarget,
+          target_admissions: monthlyAdmissionTarget,
         },
         { onConflict: "counselor_id,target_month" }
       );
     }
 
     revalidatePath("/dashboard/counselors");
+    revalidatePath("/dashboard/admissions");
     revalidatePath("/dashboard");
 
     return {
       success: true,
-      message: `Counselor "${normalizedFullName}" added successfully.`,
+      message: `Counselor "${normalizedFullName}" (${normalizedEmployeeCode}) created successfully.`,
       data: newCounselor,
     };
   } catch (err: any) {
     return {
       success: false,
-      error: "Failed to create counselor: " + (err?.message || "Unknown error"),
+      error: "Unexpected error creating counselor: " + (err?.message || "Unknown error"),
     };
   }
 }
 
 /**
- * Updates an existing counselor's details
- * Note: Does not overwrite historical monthly targets
+ * Updates existing counselor details
  */
 export async function updateCounselorAction(
   id: string,
@@ -341,43 +404,26 @@ export async function updateCounselorAction(
   }
 
   const supabase = auth.supabase;
-  const updates: Record<string, any> = {};
+  const updates: any = {};
 
-  if (formData.employee_code !== undefined) {
-    const code = formData.employee_code.trim().toUpperCase();
-    if (!code) return { success: false, error: "Employee code cannot be empty." };
-    updates.employee_code = code;
+  if (formData.employee_code) {
+    updates.employee_code = formData.employee_code.trim().toUpperCase();
   }
-
-  if (formData.full_name !== undefined) {
-    const name = formData.full_name.trim();
-    if (!name) return { success: false, error: "Full name cannot be empty." };
-    updates.full_name = name;
+  if (formData.full_name) {
+    updates.full_name = formData.full_name.trim();
   }
-
   if (formData.email !== undefined) {
-    const email = formData.email.trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      return { success: false, error: "A valid email address is required." };
-    }
-    updates.email = email;
+    updates.email = formData.email?.trim().toLowerCase() || null;
   }
-
   if (formData.phone !== undefined) {
-    const phone = formData.phone.trim();
-    if (!phone) return { success: false, error: "Phone number cannot be empty." };
-    updates.phone = phone;
+    updates.phone = formData.phone?.trim() || null;
   }
-
   if (formData.monthly_target !== undefined) {
-    const target = Number(formData.monthly_target);
-    if (isNaN(target) || target < 0) {
-      return { success: false, error: "Monthly target must be a non-negative number." };
-    }
-    updates.monthly_target = target;
+    updates.monthly_target = Math.max(0, Number(formData.monthly_target) || 0);
   }
-
+  if (formData.monthly_admission_target !== undefined) {
+    updates.monthly_admission_target = Math.max(0, Number(formData.monthly_admission_target) || 0);
+  }
   if (formData.is_active !== undefined) {
     updates.is_active = Boolean(formData.is_active);
   }
@@ -401,6 +447,7 @@ export async function updateCounselorAction(
     }
 
     revalidatePath("/dashboard/counselors");
+    revalidatePath("/dashboard/admissions");
     revalidatePath("/dashboard");
 
     return {
@@ -417,13 +464,14 @@ export async function updateCounselorAction(
 }
 
 /**
- * Updates or creates a month-specific target for a counselor
- * Preserves past/future months without silent alteration
+ * Updates or creates a month-specific target for a counselor with full audit trail
  */
 export async function updateMonthlyTargetAction(
   counselor_id: string,
   target_month: string,
-  target_amount: number
+  target_amount: number,
+  target_admissions: number = 0,
+  notes?: string
 ): Promise<CounselorActionResponse> {
   const auth = await verifyAdminAuth();
   if (!auth.isAuthorized || !auth.supabase) {
@@ -431,17 +479,34 @@ export async function updateMonthlyTargetAction(
   }
 
   const supabase = auth.supabase;
+  const adminEmail = auth.user?.email || "sachin.behera@collegevidya.com";
   const normalizedMonth = normalizeMonthKey(target_month);
   const amount = Number(target_amount);
+  const admissions = Number(target_admissions);
 
   if (isNaN(amount) || amount < 0) {
     return {
       success: false,
-      error: "Target amount must be a non-negative number.",
+      error: "Target collection amount must be a non-negative number.",
+    };
+  }
+  if (isNaN(admissions) || admissions < 0) {
+    return {
+      success: false,
+      error: "Target admissions must be a non-negative whole number.",
     };
   }
 
   try {
+    // 1. Fetch current target if any to record audit diff
+    const { data: existingTarget } = await supabase
+      .from("counselor_monthly_targets")
+      .select("target_amount, target_admissions")
+      .eq("counselor_id", counselor_id)
+      .eq("target_month", normalizedMonth)
+      .maybeSingle();
+
+    // 2. Upsert the target record
     const { data, error } = await supabase
       .from("counselor_monthly_targets")
       .upsert(
@@ -449,6 +514,10 @@ export async function updateMonthlyTargetAction(
           counselor_id,
           target_month: normalizedMonth,
           target_amount: amount,
+          target_admissions: admissions,
+          notes: notes?.trim() || null,
+          updated_by_email: adminEmail,
+          is_explicitly_assigned: true,
         },
         { onConflict: "counselor_id,target_month" }
       )
@@ -462,12 +531,25 @@ export async function updateMonthlyTargetAction(
       };
     }
 
+    // 3. Insert audit log
+    await supabase.from("counselor_target_audit_logs").insert({
+      counselor_id,
+      target_month: normalizedMonth,
+      old_target_amount: existingTarget?.target_amount ?? null,
+      new_target_amount: amount,
+      old_target_admissions: existingTarget?.target_admissions ?? null,
+      new_target_admissions: admissions,
+      notes: notes?.trim() || null,
+      changed_by_email: adminEmail,
+    });
+
     revalidatePath("/dashboard/counselors");
+    revalidatePath("/dashboard/daily-tracker");
     revalidatePath("/dashboard");
 
     return {
       success: true,
-      message: "Target updated successfully for selected month.",
+      message: `Targets updated successfully for ${formatMonthDisplay(normalizedMonth)}.`,
       data,
     };
   } catch (err: any) {
@@ -475,6 +557,130 @@ export async function updateMonthlyTargetAction(
       success: false,
       error: "Error updating target: " + (err?.message || "Unknown error"),
     };
+  }
+}
+
+/**
+ * Fetches the audit trail of target revisions for a counselor and month
+ */
+export async function getTargetAuditLogsAction(
+  counselor_id: string,
+  target_month?: string
+): Promise<{ success: boolean; logs: any[]; error?: string }> {
+  const auth = await verifyAdminAuth();
+  if (!auth.isAuthorized || !auth.supabase) {
+    return { success: false, logs: [], error: auth.error };
+  }
+
+  const supabase = auth.supabase;
+  try {
+    let query = supabase
+      .from("counselor_target_audit_logs")
+      .select("*")
+      .eq("counselor_id", counselor_id)
+      .order("created_at", { ascending: false });
+
+    if (target_month) {
+      query = query.eq("target_month", normalizeMonthKey(target_month));
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      return { success: false, logs: [], error: error.message };
+    }
+
+    return { success: true, logs: data || [] };
+  } catch (err: any) {
+    return { success: false, logs: [], error: err?.message };
+  }
+}
+
+/**
+ * Pre-fills suggested targets from baseline quota for unassigned counselors in a selected month.
+ * Explicitly marks each record as assigned with an audit trail note.
+ */
+export async function assignSuggestedTargetsAction(
+  target_month: string
+): Promise<CounselorActionResponse> {
+  const auth = await verifyAdminAuth();
+  if (!auth.isAuthorized || !auth.supabase) {
+    return { success: false, error: auth.error };
+  }
+
+  const supabase = auth.supabase;
+  const adminEmail = auth.user?.email || "sachin.behera@collegevidya.com";
+  const normalizedMonth = normalizeMonthKey(target_month);
+
+  try {
+    // 1. Fetch active counselors
+    const { data: counselors, error: cErr } = await supabase
+      .from("counselors")
+      .select("id, monthly_target, monthly_admission_target")
+      .eq("is_active", true);
+
+    if (cErr || !counselors) {
+      return { success: false, error: "Failed to fetch counselors: " + cErr?.message };
+    }
+
+    // 2. Fetch existing assigned targets for month
+    const { data: existingTargets } = await supabase
+      .from("counselor_monthly_targets")
+      .select("counselor_id")
+      .eq("target_month", normalizedMonth);
+
+    const assignedSet = new Set((existingTargets || []).map((t: any) => t.counselor_id));
+    const toAssign = counselors.filter((c: any) => !assignedSet.has(c.id));
+
+    if (toAssign.length === 0) {
+      return {
+        success: true,
+        message: "All counselors already have assigned targets for " + formatMonthDisplay(normalizedMonth) + ".",
+      };
+    }
+
+    // 3. Upsert suggested targets
+    const inserts = toAssign.map((c: any) => ({
+      counselor_id: c.id,
+      target_month: normalizedMonth,
+      target_amount: Number(c.monthly_target) || 550000,
+      target_admissions: Number(c.monthly_admission_target) || 6,
+      notes: "Pre-filled suggested targets confirmed by administrator",
+      updated_by_email: adminEmail,
+      is_explicitly_assigned: true,
+    }));
+
+    const { error: upsertErr } = await supabase
+      .from("counselor_monthly_targets")
+      .upsert(inserts, { onConflict: "counselor_id,target_month" });
+
+    if (upsertErr) {
+      return { success: false, error: "Failed to assign targets: " + upsertErr.message };
+    }
+
+    // 4. Record audit logs
+    const auditLogs = toAssign.map((c: any) => ({
+      counselor_id: c.id,
+      target_month: normalizedMonth,
+      old_target_amount: null,
+      new_target_amount: Number(c.monthly_target) || 550000,
+      old_target_admissions: null,
+      new_target_admissions: Number(c.monthly_admission_target) || 6,
+      notes: "Pre-filled suggested baseline target confirmed by administrator",
+      changed_by_email: adminEmail,
+    }));
+
+    await supabase.from("counselor_target_audit_logs").insert(auditLogs);
+
+    revalidatePath("/dashboard/counselors");
+    revalidatePath("/dashboard/daily-tracker");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      message: `Assigned suggested targets for ${toAssign.length} counselors in ${formatMonthDisplay(normalizedMonth)}.`,
+    };
+  } catch (err: any) {
+    return { success: false, error: "Error assigning suggested targets: " + (err?.message || "Unknown error") };
   }
 }
 
@@ -503,6 +709,7 @@ export async function toggleCounselorStatusAction(
     }
 
     revalidatePath("/dashboard/counselors");
+    revalidatePath("/dashboard/admissions");
     revalidatePath("/dashboard");
 
     return {
@@ -519,7 +726,8 @@ export async function toggleCounselorStatusAction(
 
 /**
  * Deletes or deactivates a counselor record
- * Protects historical data: If dependent records exist, deletion is blocked or converted to deactivation
+ * Protects historical data: If dependent records exist in targets or admissions,
+ * deletion is blocked or converted to safe deactivation.
  */
 export async function deleteCounselorAction(
   id: string,
@@ -598,6 +806,7 @@ export async function deleteCounselorAction(
     }
 
     revalidatePath("/dashboard/counselors");
+    revalidatePath("/dashboard/admissions");
     revalidatePath("/dashboard");
 
     return {
@@ -608,6 +817,65 @@ export async function deleteCounselorAction(
     return {
       success: false,
       error: "Error deleting counselor: " + (err?.message || "Unknown error"),
+    };
+  }
+}
+
+/**
+ * Idempotently imports or synchronizes the 9 master counselors using employee_code as key.
+ * Preserves any existing email, phone, or historical targets/admissions.
+ */
+export async function importMasterCounselorsAction(): Promise<{
+  success: boolean;
+  count: number;
+  message?: string;
+  error?: string;
+}> {
+  const auth = await verifyAdminAuth();
+  if (!auth.isAuthorized || !auth.supabase) {
+    return { success: false, count: 0, error: auth.error };
+  }
+
+  const supabase = auth.supabase;
+
+  try {
+    let synced = 0;
+    for (const master of AUTHORIZED_MASTER_COUNSELORS) {
+      const { error: upsertError } = await supabase.from("counselors").upsert(
+        {
+          employee_code: master.employee_code,
+          full_name: master.full_name,
+          monthly_target: master.monthly_target,
+          monthly_admission_target: master.monthly_admission_target,
+          is_active: true,
+        },
+        { onConflict: "employee_code", ignoreDuplicates: false }
+      );
+
+      if (upsertError) {
+        return {
+          success: false,
+          count: synced,
+          error: `Error syncing counselor ${master.full_name} (${master.employee_code}): ${upsertError.message}`,
+        };
+      }
+      synced++;
+    }
+
+    revalidatePath("/dashboard/counselors");
+    revalidatePath("/dashboard/admissions");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      count: synced,
+      message: `Successfully synchronized all ${synced} authorized master counselors.`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      count: 0,
+      error: err?.message || "Failed to import master counselors",
     };
   }
 }

@@ -20,6 +20,7 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [monthlyTarget, setMonthlyTarget] = useState<number | string>(0);
+  const [monthlyAdmissionTarget, setMonthlyAdmissionTarget] = useState<number | string>(0);
   const [isActive, setIsActive] = useState(true);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -30,9 +31,10 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
     if (counselor) {
       setEmployeeCode(counselor.employee_code);
       setFullName(counselor.full_name);
-      setEmail(counselor.email);
-      setPhone(counselor.phone);
+      setEmail(counselor.email || "");
+      setPhone(counselor.phone || "");
       setMonthlyTarget(counselor.monthly_target);
+      setMonthlyAdmissionTarget(counselor.monthly_admission_target || 0);
       setIsActive(counselor.is_active);
     } else {
       setEmployeeCode("");
@@ -40,6 +42,7 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
       setEmail("");
       setPhone("");
       setMonthlyTarget(0);
+      setMonthlyAdmissionTarget(0);
       setIsActive(true);
     }
     setErrors({});
@@ -55,9 +58,10 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
     const formData: CounselorFormData = {
       employee_code: employeeCode.trim().toUpperCase(),
       full_name: fullName.trim(),
-      email: email.trim().toLowerCase(),
-      phone: phone.trim(),
+      email: email.trim().toLowerCase() || undefined,
+      phone: phone.trim() || undefined,
       monthly_target: Math.max(0, Number(monthlyTarget) || 0),
+      monthly_admission_target: Math.max(0, Number(monthlyAdmissionTarget) || 0),
       is_active: isActive,
     };
 
@@ -199,33 +203,54 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
             </div>
           </div>
 
-          {/* Base Monthly Target */}
-          <div>
-            <label className="block text-xs font-semibold text-navy-800 mb-1 uppercase tracking-wider">
-              Default Monthly Target (₹ INR) *
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-semibold text-gray-500">
-                ₹
-              </span>
+          {/* Base Monthly Targets Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-xs font-semibold text-navy-800 mb-1 uppercase tracking-wider">
+                Monthly Collection Target (₹) *
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-semibold text-gray-500">
+                  ₹
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="5000"
+                  value={monthlyTarget}
+                  onChange={(e) => setMonthlyTarget(e.target.value)}
+                  placeholder="550000"
+                  disabled={isSubmitting}
+                  className="w-full pl-8 pr-3 py-2 bg-surface-light border border-gray-300 rounded-lg text-sm text-navy-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent"
+                />
+              </div>
+              {errors.monthly_target && (
+                <p className="text-[11px] text-red-600 mt-1">{errors.monthly_target}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-navy-800 mb-1 uppercase tracking-wider">
+                Monthly Admission Target *
+              </label>
               <input
                 type="number"
                 min="0"
-                step="5000"
-                value={monthlyTarget}
-                onChange={(e) => setMonthlyTarget(e.target.value)}
-                placeholder="200000"
+                step="1"
+                value={monthlyAdmissionTarget}
+                onChange={(e) => setMonthlyAdmissionTarget(e.target.value)}
+                placeholder="6"
                 disabled={isSubmitting}
-                className="w-full pl-8 pr-3 py-2 bg-surface-light border border-gray-300 rounded-lg text-sm text-navy-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent"
+                className="w-full px-3 py-2 bg-surface-light border border-gray-300 rounded-lg text-sm text-navy-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent"
               />
+              {errors.monthly_admission_target && (
+                <p className="text-[11px] text-red-600 mt-1">{errors.monthly_admission_target}</p>
+              )}
             </div>
-            {errors.monthly_target && (
-              <p className="text-[11px] text-red-600 mt-1">{errors.monthly_target}</p>
-            )}
-            <p className="text-[11px] text-gray-500 mt-1">
-              Serves as baseline target. Specific month targets can be set separately without altering historical records.
-            </p>
           </div>
+          <p className="text-[11px] text-gray-500 -mt-2">
+            Baseline collection and admission quotas for counselor evaluations.
+          </p>
 
           {/* Active Status */}
           <div className="pt-2 flex items-center justify-between border-t border-gray-100">

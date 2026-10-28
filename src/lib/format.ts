@@ -21,7 +21,8 @@ export function formatINR(amount: number): string {
  */
 export function calculateAchievement(
   revenue: number | null,
-  target: number
+  target: number,
+  fractionDigits: number = 2
 ): { status: "NOT_CONFIGURED" | "TARGET_NOT_SET" | "CALCULATED"; percentage: number | null; display: string } {
   if (revenue === null || revenue === undefined) {
     return {
@@ -43,7 +44,7 @@ export function calculateAchievement(
   return {
     status: "CALCULATED",
     percentage,
-    display: `${percentage.toFixed(1)}%`,
+    display: `${percentage.toFixed(fractionDigits)}%`,
   };
 }
 
@@ -89,8 +90,8 @@ export function getMonthOptions(baseDate: Date = new Date()): Array<{ value: str
   const currentYear = baseDate.getFullYear();
   const currentMonth = baseDate.getMonth();
 
-  // 3 months prior to 3 months ahead
-  for (let offset = -3; offset <= 3; offset++) {
+  // 6 months prior to 6 months ahead
+  for (let offset = -6; offset <= 6; offset++) {
     const d = new Date(currentYear, currentMonth + offset, 1);
     const value = normalizeMonthKey(d);
     const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -98,6 +99,80 @@ export function getMonthOptions(baseDate: Date = new Date()): Array<{ value: str
   }
 
   return options;
+}
+
+export interface MonthCalendarDay {
+  date: string; // YYYY-MM-DD
+  dayNumber: number;
+  dayName: string;
+  isWeekend: boolean;
+}
+
+/**
+ * Returns all calendar days for a given monthKey (YYYY-MM-01).
+ * Accurately handles 28, 29 (leap years), 30, and 31 day months.
+ */
+export function getCalendarDaysForMonth(monthKey: string): MonthCalendarDay[] {
+  const normalized = normalizeMonthKey(monthKey);
+  const [yearStr, monthStr] = normalized.split("-");
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const totalDays = new Date(year, month, 0).getDate();
+
+  const days: MonthCalendarDay[] = [];
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  for (let day = 1; day <= totalDays; day++) {
+    const d = new Date(year, month - 1, day);
+    const dateStr = `${yearStr}-${monthStr}-${String(day).padStart(2, "0")}`;
+    const dayOfWeek = d.getDay();
+    days.push({
+      date: dateStr,
+      dayNumber: day,
+      dayName: dayNames[dayOfWeek],
+      isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+    });
+  }
+
+  return days;
+}
+
+/**
+ * Calculates longest and current zero streaks from daily statuses.
+ * Per requirement: Interrupted by positive collection, admission, or missing data (no_data).
+ */
+export function calculateZeroStreaks(
+  days: Array<{ date: string; status: string }>,
+  cutOffDate?: string
+): { longestStreak: number; currentStreak: number } {
+  let longestStreak = 0;
+  let runningStreak = 0;
+
+  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
+
+  for (const day of sorted) {
+    if (day.status === "zero_confirmed") {
+      runningStreak++;
+      if (runningStreak > longestStreak) {
+        longestStreak = runningStreak;
+      }
+    } else {
+      runningStreak = 0;
+    }
+  }
+
+  let currentStreak = 0;
+  const filtered = cutOffDate ? sorted.filter((d) => d.date <= cutOffDate) : sorted;
+
+  for (let i = filtered.length - 1; i >= 0; i--) {
+    if (filtered[i].status === "zero_confirmed") {
+      currentStreak++;
+    } else {
+      break;
+    }
+  }
+
+  return { longestStreak, currentStreak };
 }
 
 /**
@@ -109,6 +184,7 @@ export function validateCounselorInput(input: {
   email?: string;
   phone?: string;
   monthly_target?: number | string;
+  monthly_admission_target?: number | string;
 }): { isValid: boolean; errors: Record<string, string> } {
   const errors: Record<string, string> = {};
 
@@ -128,23 +204,26 @@ export function validateCounselorInput(input: {
 
   const email = input.email?.trim().toLowerCase() || "";
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email) {
-    errors.email = "Work email is required.";
-  } else if (!emailRegex.test(email)) {
+  if (email && !emailRegex.test(email)) {
     errors.email = "Please enter a valid work email address.";
   }
 
   const phone = input.phone?.trim() || "";
   const phoneRegex = /^[+]?[\d\s-]{8,15}$/;
-  if (!phone) {
-    errors.phone = "Phone number is required.";
-  } else if (!phoneRegex.test(phone)) {
+  if (phone && !phoneRegex.test(phone)) {
     errors.phone = "Please enter a valid phone number (8-15 digits).";
   }
 
   const target = Number(input.monthly_target);
-  if (isNaN(target) || target < 0) {
+  if (input.monthly_target !== undefined && (isNaN(target) || target < 0)) {
     errors.monthly_target = "Monthly target must be a non-negative number.";
+  }
+
+  if (input.monthly_admission_target !== undefined && input.monthly_admission_target !== "") {
+    const admTarget = Number(input.monthly_admission_target);
+    if (isNaN(admTarget) || admTarget < 0 || !Number.isInteger(admTarget)) {
+      errors.monthly_admission_target = "Admission target must be a non-negative whole number.";
+    }
   }
 
   return {
