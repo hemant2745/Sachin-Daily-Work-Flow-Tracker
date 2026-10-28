@@ -15,6 +15,8 @@ interface MetricCardProps {
   title: string;
   iconName: "target" | "revenue" | "percentage" | "admissions" | "tasks" | "projections";
   placeholderValue?: string;
+  value?: string;
+  isLive?: boolean;
   description: string;
   statusLabel?: string;
   phaseNote?: string;
@@ -33,6 +35,8 @@ export function MetricCard({
   title,
   iconName,
   placeholderValue = "Not configured",
+  value,
+  isLive = false,
   description,
   statusLabel = "Awaiting Setup",
   phaseNote = "Data will appear after setup",
@@ -52,11 +56,17 @@ export function MetricCard({
           </div>
         </div>
 
-        {/* Placeholder Value Display */}
+        {/* Value Display */}
         <div className="my-2">
-          <div className="inline-flex items-center px-3 py-1.5 rounded-lg bg-surface-light border border-dashed border-gray-300 text-sm font-medium text-gray-500">
-            {placeholderValue}
-          </div>
+          {isLive && value !== undefined ? (
+            <div className="text-2xl font-bold text-navy-800">
+              {value}
+            </div>
+          ) : (
+            <div className="inline-flex items-center px-3 py-1.5 rounded-lg bg-surface-light border border-dashed border-gray-300 text-sm font-medium text-gray-500">
+              {placeholderValue}
+            </div>
+          )}
         </div>
 
         {/* Metric Purpose / Description */}
@@ -68,10 +78,10 @@ export function MetricCard({
       {/* Footer / Status Label */}
       <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-[11px]">
         <span className="inline-flex items-center gap-1.5 text-gray-500">
-          <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+          <span className={cn("w-1.5 h-1.5 rounded-full", isLive ? "bg-emerald-500" : "bg-gray-400")}></span>
           <span>{statusLabel}</span>
         </span>
-        <span className="text-brand-orange font-medium text-[10px] tracking-tight">
+        <span className={cn("font-medium text-[10px] tracking-tight", isLive ? "text-emerald-700 font-semibold" : "text-brand-orange")}>
           {phaseNote}
         </span>
       </div>

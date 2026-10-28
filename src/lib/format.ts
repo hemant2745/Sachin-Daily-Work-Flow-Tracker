@@ -35,7 +35,7 @@ export function calculateAchievement(
     return {
       status: "TARGET_NOT_SET",
       percentage: null,
-      display: "Target not set",
+      display: "N/A",
     };
   }
 
@@ -64,6 +64,21 @@ export function formatMonthDisplay(monthKey: string): string {
   const [year, month] = monthKey.split("-");
   const d = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+/**
+ * Returns the exact first and last day for a given monthKey (YYYY-MM-01).
+ * E.g. "2026-10-01" -> { startDate: "2026-10-01", endDate: "2026-10-31" }
+ */
+export function getMonthDateRange(monthKey: string): { startDate: string; endDate: string } {
+  const normalized = normalizeMonthKey(monthKey);
+  const [yearStr, monthStr] = normalized.split("-");
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const lastDay = new Date(year, month, 0).getDate();
+  const startDate = `${yearStr}-${monthStr}-01`;
+  const endDate = `${yearStr}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
+  return { startDate, endDate };
 }
 
 /**
@@ -130,6 +145,68 @@ export function validateCounselorInput(input: {
   const target = Number(input.monthly_target);
   if (isNaN(target) || target < 0) {
     errors.monthly_target = "Monthly target must be a non-negative number.";
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+/**
+ * Client-side and server-side validation for admission input
+ */
+export function validateAdmissionInput(input: {
+  counselor_id?: string;
+  admission_date?: string;
+  university_name?: string;
+  program_name?: string;
+  amount_collected?: number | string;
+  payment_mode?: string;
+  notes?: string;
+}): { isValid: boolean; errors: Record<string, string> } {
+  const errors: Record<string, string> = {};
+
+  const counselorId = input.counselor_id?.trim() || "";
+  if (!counselorId) {
+    errors.counselor_id = "Please select an assigned counselor.";
+  }
+
+  const admissionDate = input.admission_date?.trim() || "";
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!admissionDate) {
+    errors.admission_date = "Admission date is required.";
+  } else if (!dateRegex.test(admissionDate) || isNaN(new Date(admissionDate).getTime())) {
+    errors.admission_date = "Please enter a valid admission date (YYYY-MM-DD).";
+  }
+
+  const universityName = input.university_name?.trim() || "";
+  if (!universityName) {
+    errors.university_name = "University name is required.";
+  } else if (universityName.length < 2) {
+    errors.university_name = "University name must be at least 2 characters.";
+  }
+
+  const programName = input.program_name?.trim() || "";
+  if (!programName) {
+    errors.program_name = "Program name is required.";
+  } else if (programName.length < 2) {
+    errors.program_name = "Program name must be at least 2 characters.";
+  }
+
+  const amount = Number(input.amount_collected);
+  if (input.amount_collected === "" || input.amount_collected === undefined || input.amount_collected === null || isNaN(amount)) {
+    errors.amount_collected = "Amount collected is required and must be a valid number.";
+  } else if (amount < 0) {
+    errors.amount_collected = "Amount collected must be a non-negative number.";
+  }
+
+  const validPaymentModes = ["semester_fees", "annual_fees", "full_fees"];
+  const paymentMode = input.payment_mode?.trim() || "";
+  if (!paymentMode) {
+    errors.payment_mode = "Payment mode is required.";
+  } else if (!validPaymentModes.includes(paymentMode)) {
+    errors.payment_mode = "Invalid payment mode. Supported modes: Semester Fees, Annual Fees, Full Fees.";
   }
 
   return {

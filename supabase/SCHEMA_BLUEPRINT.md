@@ -51,20 +51,21 @@
 
 ---
 
-## 3. Planned for Phase 4: Admissions Pipeline & Verified Collections
+## 3. Implemented in Phase 4: Admissions Pipeline & Verified Collections
 
 ### `public.admissions`
 - `id` (UUID, PK, DEFAULT `gen_random_uuid()`)
-- `admission_id` (TEXT, UNIQUE, NOT NULL)
-- `counselor_id` (UUID, references `counselors(id)`)
-- `student_name` (TEXT NOT NULL)
-- `university_name` (TEXT NOT NULL)
-- `course_name` (TEXT NOT NULL)
-- `fee_amount` (NUMERIC(12,2) NOT NULL)
-- `admission_date` (DATE NOT NULL)
-- `status` (TEXT, CHECK: `'verified'`, `'pending_fee'`, `'cancelled'`)
-- `created_at` (TIMESTAMPTZ)
-- `updated_at` (TIMESTAMPTZ)
+- `counselor_id` (UUID, NOT NULL, references `counselors(id) ON DELETE RESTRICT`)
+- `admission_date` (DATE, NOT NULL) -- Primary reporting date for monthly revenue attribution
+- `university_name` (TEXT, NOT NULL, CHECK: non-empty)
+- `program_name` (TEXT, NOT NULL, CHECK: non-empty)
+- `amount_collected` (NUMERIC(12,2), NOT NULL, DEFAULT 0.00, CHECK >= 0) -- Actual verified collection amount
+- `payment_mode` (TEXT, NOT NULL, CHECK: `'semester_fees'`, `'annual_fees'`, `'full_fees'`)
+- `notes` (TEXT, optional)
+- `created_at` (TIMESTAMPTZ, NOT NULL)
+- `updated_at` (TIMESTAMPTZ, NOT NULL)
+- *Foreign Key Rule*: `ON DELETE RESTRICT` (Protects historical admissions from silent cascade deletion)
+- *RLS*: Enabled. Read/write operations strictly restricted to verified administrators via `public.is_admin()`.
 
 ---
 

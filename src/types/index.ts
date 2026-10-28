@@ -14,3 +14,7 @@ export type MetricPlaceholder = {
   iconName: string;
   statusText: string;
 };
+
+export * from "./counselor";
+export * from "./admissions";
+

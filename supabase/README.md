@@ -53,6 +53,13 @@ This guide details how to configure a brand new, isolated Supabase project for *
 3. Paste into the SQL Editor and click **Run**.
 4. Verify that `public.counselors` and `public.counselor_monthly_targets` are created with RLS enabled.
 
+### Migration 3: Phase 4 Admissions Pipeline & Verified Collections
+1. Click **New Query** in the SQL Editor.
+2. Open and copy the contents of:
+   [`supabase/migrations/20261029000000_create_admissions.sql`](./migrations/20261029000000_create_admissions.sql)
+3. Paste into the SQL Editor and click **Run**.
+4. Verify that `public.admissions` is created with RLS enabled, `is_admin()` policy attached, and `ON DELETE RESTRICT` constraint referencing `counselors(id)`.
+
 ---
 
 ## 4. Create the Administrator Account (No Public Sign-Up)

@@ -49,6 +49,8 @@ interface CounselorListProps {
     activeCounselors: number;
     combinedMonthlyTarget: number;
     unconfiguredTargetsCount: number;
+    teamActualRevenue?: number;
+    teamAchievementPercentage?: number | null;
   };
   initialMonth: string;
   isConfigured: boolean;
@@ -336,15 +338,21 @@ export function CounselorList({
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
               Team Actual Revenue
             </span>
-            <div className="w-8 h-8 rounded-lg bg-navy-50 text-navy-800 flex items-center justify-center">
-              <DollarSign className="w-4 h-4 text-gray-400" />
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+              <DollarSign className="w-4 h-4 text-emerald-600" />
             </div>
           </div>
-          <div className="text-sm font-semibold text-gray-400 py-1.5">
-            Not configured
+          <div className="text-2xl font-bold text-navy-800">
+            {formatINR(summary.teamActualRevenue || 0)}
           </div>
-          <p className="text-[11px] text-gray-400 mt-1">
-            Admissions module scheduled for Phase 4
+          <p className="text-[11px] text-gray-500 mt-1">
+            {summary.teamAchievementPercentage !== null && summary.teamAchievementPercentage !== undefined ? (
+              <span className="text-emerald-600 font-medium">
+                {summary.teamAchievementPercentage.toFixed(1)}% of monthly target achieved
+              </span>
+            ) : (
+              <span>Verified collections for {formatMonthDisplay(selectedMonth)}</span>
+            )}
           </p>
         </div>
       </div>
@@ -512,15 +520,25 @@ export function CounselorList({
                         )}
                       </td>
 
-                      {/* Actual Revenue (Phase 4 Notice) */}
-                      <td className="py-3.5 px-4 text-right text-gray-400">
-                        <span className="italic">Not configured</span>
-                        <div className="text-[10px] text-gray-400 font-normal">Admissions Phase 4</div>
+                      {/* Actual Revenue */}
+                      <td className="py-3.5 px-4 text-right font-semibold text-navy-800">
+                        <div>{formatINR(c.actual_revenue || 0)}</div>
+                        <div className="text-[10px] text-gray-400 font-normal">
+                          {c.actual_revenue && c.actual_revenue > 0 ? "Verified collections" : "₹0 recorded"}
+                        </div>
                       </td>
 
                       {/* Achievement % */}
                       <td className="py-3.5 px-4 text-center">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-600">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium ${
+                            achievement.status === "CALCULATED"
+                              ? (achievement.percentage || 0) >= 100
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-blue-50 text-blue-700 border border-blue-200"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
                           {achievement.display}
                         </span>
                       </td>

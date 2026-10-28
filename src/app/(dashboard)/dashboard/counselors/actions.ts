@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { evaluateSessionAccess } from "@/lib/auth/admin";
-import { validateCounselorInput, normalizeMonthKey } from "@/lib/format";
+import { validateCounselorInput, normalizeMonthKey, getMonthDateRange } from "@/lib/format";
 import type {
   Counselor,
   CounselorMonthlyTarget,
@@ -72,6 +72,8 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
     activeCounselors: number;
     combinedMonthlyTarget: number;
     unconfiguredTargetsCount: number;
+    teamActualRevenue: number;
+    teamAchievementPercentage: number | null;
   };
   error?: string;
 }> {
@@ -88,6 +90,8 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
         activeCounselors: 0,
         combinedMonthlyTarget: 0,
         unconfiguredTargetsCount: 0,
+        teamActualRevenue: 0,
+        teamAchievementPercentage: null,
       },
       error: auth.error,
     };
@@ -112,6 +116,8 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
           activeCounselors: 0,
           combinedMonthlyTarget: 0,
           unconfiguredTargetsCount: 0,
+          teamActualRevenue: 0,
+          teamAchievementPercentage: null,
         },
         error: "Failed to fetch counselors: " + counselorsError.message,
       };
@@ -138,6 +144,8 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
           activeCounselors: 0,
           combinedMonthlyTarget: 0,
           unconfiguredTargetsCount: 0,
+          teamActualRevenue: 0,
+          teamAchievementPercentage: null,
         },
         error: "Failed to fetch monthly targets: " + targetsError.message,
       };
@@ -148,18 +156,39 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
       targetsMap.set(t.counselor_id, Number(t.target_amount) || 0);
     });
 
-    // 3. Merge counselors with month-specific target
+    // 3. Fetch admissions for selected month to calculate actual revenue
+    const { startDate: monthStart, endDate: monthEnd } = getMonthDateRange(normalizedMonth);
+    const { data: admissionsData, error: admissionsError } = await supabase
+      .from("admissions")
+      .select("counselor_id, amount_collected")
+      .gte("admission_date", monthStart)
+      .lte("admission_date", monthEnd);
+
+    // If admissions table doesn't exist yet (e.g. migration pending), default gracefully
+    const revenueMap = new Map<string, number>();
+    if (!admissionsError && admissionsData) {
+      admissionsData.forEach((a: any) => {
+        const currentVal = revenueMap.get(a.counselor_id) || 0;
+        revenueMap.set(a.counselor_id, currentVal + (Number(a.amount_collected) || 0));
+      });
+    }
+
+    // 4. Merge counselors with month-specific target & actual revenue
     let activeCounselorsCount = 0;
     let combinedMonthlyTarget = 0;
     let unconfiguredTargetsCount = 0;
+    let teamActualRevenue = 0;
 
     const mergedCounselors: CounselorWithTarget[] = counselors.map((c) => {
       const hasCustomTarget = targetsMap.has(c.id);
       const effectiveTarget = hasCustomTarget ? targetsMap.get(c.id)! : c.monthly_target;
+      const actualRevenue = revenueMap.get(c.id) || 0;
+      const achievement = effectiveTarget > 0 ? (actualRevenue / effectiveTarget) * 100 : null;
 
       if (c.is_active) {
         activeCounselorsCount++;
         combinedMonthlyTarget += effectiveTarget;
+        teamActualRevenue += actualRevenue;
         if (effectiveTarget <= 0) {
           unconfiguredTargetsCount++;
         }
@@ -169,10 +198,13 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
         ...c,
         effective_target: effectiveTarget,
         has_custom_target: hasCustomTarget,
-        actual_revenue: null, // Admissions data source not connected until Phase 4
-        achievement_percentage: null,
+        actual_revenue: actualRevenue,
+        achievement_percentage: achievement,
       };
     });
+
+    const teamAchievementPercentage =
+      combinedMonthlyTarget > 0 ? (teamActualRevenue / combinedMonthlyTarget) * 100 : null;
 
     return {
       success: true,
@@ -183,6 +215,8 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
         activeCounselors: activeCounselorsCount,
         combinedMonthlyTarget,
         unconfiguredTargetsCount,
+        teamActualRevenue,
+        teamAchievementPercentage,
       },
     };
   } catch (err: any) {
@@ -195,6 +229,8 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
         activeCounselors: 0,
         combinedMonthlyTarget: 0,
         unconfiguredTargetsCount: 0,
+        teamActualRevenue: 0,
+        teamAchievementPercentage: null,
       },
       error: "Unexpected error reading counselor records: " + (err?.message || "Unknown error"),
     };
@@ -497,19 +533,33 @@ export async function deleteCounselorAction(
   const supabase = auth.supabase;
 
   try {
-    // 1. Check if counselor has historical monthly targets or other dependencies
-    const { count, error: countError } = await supabase
+    // 1. Check if counselor has historical monthly targets or admissions dependencies
+    const { count: targetsCount, error: countError } = await supabase
       .from("counselor_monthly_targets")
       .select("id", { count: "exact", head: true })
       .eq("counselor_id", id);
 
     if (countError) {
-      return { success: false, error: "Failed to inspect dependencies: " + countError.message };
+      return { success: false, error: "Failed to inspect target dependencies: " + countError.message };
     }
 
-    const hasDependencies = (count || 0) > 0;
+    const { count: admissionsCount, error: admissionsCountError } = await supabase
+      .from("admissions")
+      .select("id", { count: "exact", head: true })
+      .eq("counselor_id", id);
+
+    // If admissions table exists and has records, protect them
+    const hasHistoricalAdmissions = !admissionsCountError && (admissionsCount || 0) > 0;
+    const hasHistoricalTargets = (targetsCount || 0) > 0;
+    const hasDependencies = hasHistoricalTargets || hasHistoricalAdmissions;
 
     if (hasDependencies) {
+      const reason = hasHistoricalAdmissions && hasHistoricalTargets
+        ? "historical monthly targets and verified admissions"
+        : hasHistoricalAdmissions
+        ? "verified admission records"
+        : "historical monthly target records";
+
       if (forceDeactivateIfHasHistory) {
         // Deactivate instead of deleting to protect historical integrity
         const { error: deactivateError } = await supabase
@@ -522,17 +572,18 @@ export async function deleteCounselorAction(
         }
 
         revalidatePath("/dashboard/counselors");
+        revalidatePath("/dashboard/admissions");
         revalidatePath("/dashboard");
 
         return {
           success: true,
-          message: "Counselor has historical monthly target records and was deactivated instead of permanently deleted to preserve historical data.",
+          message: `Counselor has ${reason} and was deactivated instead of permanently deleted to preserve historical revenue and reporting.`,
         };
       }
 
       return {
         success: false,
-        error: "Cannot permanently delete counselor because historical monthly target records exist. Deactivate the counselor instead to preserve historical reporting.",
+        error: `Cannot permanently delete counselor because ${reason} exist. Deactivate the counselor instead to preserve historical reporting.`,
       };
     }
 
