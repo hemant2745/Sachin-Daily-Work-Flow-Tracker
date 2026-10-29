@@ -511,3 +511,89 @@ test("15. Repeated endpoint calls and concurrency claim guarantee no duplicate r
     "Next cycle does not re-send already sent reminder"
   );
 });
+
+test("16. Temporary REMINDER_TO_EMAIL override is used when configured", () => {
+  function resolveRecipient(env, reminderRecipient) {
+    const override = env.REMINDER_TO_EMAIL?.trim();
+    if (override) return override;
+    const adminEmail = env.ADMIN_EMAIL?.trim();
+    if (adminEmail) return adminEmail;
+    return reminderRecipient?.trim() || "sachin.behera@collegevidya.com";
+  }
+
+  // 1. Valid test override email
+  const envWithOverride = {
+    REMINDER_TO_EMAIL: "tester@example.com",
+    ADMIN_EMAIL: "sachin.behera@collegevidya.com",
+  };
+  assert.equal(
+    resolveRecipient(envWithOverride, "sachin.behera@collegevidya.com"),
+    "tester@example.com",
+    "Should use REMINDER_TO_EMAIL when configured"
+  );
+
+  // 2. Override with surrounding whitespace is trimmed properly
+  const envWithWhitespace = {
+    REMINDER_TO_EMAIL: "  custom-override@domain.org  ",
+  };
+  assert.equal(
+    resolveRecipient(envWithWhitespace, "sachin.behera@collegevidya.com"),
+    "custom-override@domain.org",
+    "Should trim whitespace on REMINDER_TO_EMAIL"
+  );
+});
+
+test("17. Existing admin recipient remains the fallback when REMINDER_TO_EMAIL is absent or empty", () => {
+  function resolveRecipient(env, reminderRecipient) {
+    const override = env.REMINDER_TO_EMAIL?.trim();
+    if (override) return override;
+    const adminEmail = env.ADMIN_EMAIL?.trim();
+    if (adminEmail) return adminEmail;
+    return reminderRecipient?.trim() || "sachin.behera@collegevidya.com";
+  }
+
+  // 1. Absent REMINDER_TO_EMAIL with ADMIN_EMAIL configured
+  const envWithAdmin = {
+    ADMIN_EMAIL: "sachin.behera@collegevidya.com",
+  };
+  assert.equal(
+    resolveRecipient(envWithAdmin, "other@test.com"),
+    "sachin.behera@collegevidya.com",
+    "Should fallback to ADMIN_EMAIL when REMINDER_TO_EMAIL is absent"
+  );
+
+  // 2. Empty string REMINDER_TO_EMAIL falls back to ADMIN_EMAIL
+  const envWithEmptyOverride = {
+    REMINDER_TO_EMAIL: "",
+    ADMIN_EMAIL: "sachin.behera@collegevidya.com",
+  };
+  assert.equal(
+    resolveRecipient(envWithEmptyOverride, null),
+    "sachin.behera@collegevidya.com",
+    "Should fallback to ADMIN_EMAIL when REMINDER_TO_EMAIL is empty"
+  );
+
+  // 3. Whitespace-only REMINDER_TO_EMAIL falls back to ADMIN_EMAIL
+  const envWithWhitespaceOverride = {
+    REMINDER_TO_EMAIL: "   ",
+    ADMIN_EMAIL: "sachin.behera@collegevidya.com",
+  };
+  assert.equal(
+    resolveRecipient(envWithWhitespaceOverride, null),
+    "sachin.behera@collegevidya.com",
+    "Should fallback to ADMIN_EMAIL when REMINDER_TO_EMAIL is whitespace"
+  );
+
+  // 4. Neither env set falls back to reminder recipient or default admin identity
+  const emptyEnv = {};
+  assert.equal(
+    resolveRecipient(emptyEnv, "stored-recipient@collegevidya.com"),
+    "stored-recipient@collegevidya.com",
+    "Should fallback to stored reminder recipient when env is empty"
+  );
+  assert.equal(
+    resolveRecipient(emptyEnv, null),
+    "sachin.behera@collegevidya.com",
+    "Should fallback to default admin email when nothing is set"
+  );
+});

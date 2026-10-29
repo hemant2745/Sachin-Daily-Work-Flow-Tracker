@@ -1,4 +1,5 @@
 import type { ReminderType } from "@/types/tasks";
+import { DEFAULT_ADMIN_EMAIL } from "@/lib/auth/admin";
 
 export interface ReminderDefinition {
   type: ReminderType;
@@ -115,20 +116,43 @@ export function formatInIST(
 }
 
 /**
+ * Resolves the recipient email for a task reminder notification.
+ * 1. Checks REMINDER_TO_EMAIL server-side override (for temporary testing or staging override).
+ * 2. Checks ADMIN_EMAIL from environment.
+ * 3. Falls back to stored reminderRecipient or DEFAULT_ADMIN_EMAIL (sachin.behera@collegevidya.com).
+ */
+export function resolveReminderRecipient(reminderRecipient?: string | null): string {
+  const override = process.env.REMINDER_TO_EMAIL?.trim();
+  if (override) {
+    return override;
+  }
+  const adminEmail = process.env.ADMIN_EMAIL?.trim();
+  if (adminEmail) {
+    return adminEmail;
+  }
+  return reminderRecipient?.trim() || DEFAULT_ADMIN_EMAIL;
+}
+
+/**
  * Generates email subject line and HTML content for reminders
  */
-export function generateEmailContent(task: {
-  title: string;
-  description?: string | null;
-  scheduled_date: string;
-  scheduled_start_time: string;
-  scheduled_end_time?: string | null;
-  priority: string;
-  status: string;
-  counselor?: { full_name: string; employee_code: string } | null;
-  university?: { name: string } | null;
-  subtasks?: Array<{ title: string; status: string }> | null;
-}, reminderType: ReminderType, offsetMinutes: number): {
+export function generateEmailContent(
+  task: {
+    title: string;
+    description?: string | null;
+    scheduled_date: string;
+    scheduled_start_time: string;
+    scheduled_end_time?: string | null;
+    priority: string;
+    status: string;
+    counselor?: { full_name: string; employee_code: string } | null;
+    university?: { name: string } | null;
+    subtasks?: Array<{ title: string; status: string }> | null;
+  },
+  reminderType: ReminderType,
+  offsetMinutes: number,
+  recipientEmail?: string | null
+): {
   subject: string;
   html: string;
 } {
@@ -280,7 +304,7 @@ export function generateEmailContent(task: {
           <!-- Footer -->
           <tr>
             <td style="background-color: #f8fafc; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
-              This notification was delivered to <strong>sachin.behera@collegevidya.com</strong>.
+              This notification was delivered to <strong>${recipientEmail || DEFAULT_ADMIN_EMAIL}</strong>.
               <br>
               Sachin Behera Daily Workflow &bull; Single-Administrator System &bull; College Vidya
             </td>

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { generateEmailContent } from "@/lib/reminders";
+import { generateEmailContent, resolveReminderRecipient } from "@/lib/reminders";
 import type { ReminderType } from "@/types/tasks";
 
 /**
@@ -238,13 +238,14 @@ async function handleReminderCron(request: NextRequest) {
     }
 
     // Rule E: Send Email Notification
+    const recipient = resolveReminderRecipient(reminder.recipient_email);
+
     const { subject, html } = generateEmailContent(
       parentTask,
       reminder.reminder_type as ReminderType,
-      reminder.offset_minutes
+      reminder.offset_minutes,
+      recipient
     );
-
-    const recipient = reminder.recipient_email || "sachin.behera@collegevidya.com";
 
     // If Resend API key is configured, send live email
     if (resendApiKey) {
