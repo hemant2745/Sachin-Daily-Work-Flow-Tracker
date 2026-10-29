@@ -34,7 +34,7 @@ const navigationItems: NavItem[] = [
   { name: "Counselors", href: "/dashboard/counselors", icon: Users, isImplemented: true },
   { name: "Admissions", href: "/dashboard/admissions", icon: GraduationCap, isImplemented: true },
   { name: "Universities", href: "/dashboard/universities", icon: Building2, isImplemented: true },
-  { name: "Tasks & Subtasks", href: "/dashboard#tasks", icon: CheckSquare, isImplemented: false },
+  { name: "Tasks & Subtasks", href: "/dashboard/tasks", icon: CheckSquare, isImplemented: true },
   { name: "Daily Tracker", href: "/dashboard/daily-tracker", icon: CalendarCheck, isImplemented: true },
   { name: "Projections", href: "/dashboard#projections", icon: TrendingUp, isImplemented: false },
   { name: "Reports", href: "/dashboard#reports", icon: BarChart3, isImplemented: false },
