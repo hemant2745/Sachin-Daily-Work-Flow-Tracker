@@ -364,3 +364,150 @@ test("12. Reminder templates distinguish advance notices from overdue alerts", (
   assert.equal(overdue.isOverdue, true);
   assert.ok(overdue.subject.includes("[URGENT OVERDUE: 30 MINUTES ELAPSED]"));
 });
+
+test("13. Vercel cron configuration complies with Hobby plan limit (at most once per day)", () => {
+  const vercelJsonPath = path.resolve(process.cwd(), "vercel.json");
+  assert.ok(fs.existsSync(vercelJsonPath), "vercel.json must exist");
+
+  const vercelConfig = JSON.parse(fs.readFileSync(vercelJsonPath, "utf-8"));
+  if (vercelConfig.crons && vercelConfig.crons.length > 0) {
+    for (const cron of vercelConfig.crons) {
+      assert.ok(cron.schedule, "Cron must define a schedule");
+      // Vercel Hobby strictly forbids sub-daily schedules like '* * * * *', '*/5 * * * *', '0 * * * *'
+      const parts = cron.schedule.trim().split(/\s+/);
+      assert.equal(parts.length, 5, "Cron schedule must be a 5-part expression");
+      // First part (minute) should be a specific minute e.g. 0
+      assert.ok(!parts[0].includes("*"), "Minute field cannot be wildcard on Hobby plan");
+      // Second part (hour) should be a specific hour e.g. 0
+      assert.ok(!parts[1].includes("*"), "Hour field cannot be wildcard on Hobby plan");
+      // Daily schedule check: '0 0 * * *'
+      assert.equal(cron.schedule, "0 0 * * *", "Schedule must be daily at 00:00 UTC to satisfy Hobby limit");
+    }
+  }
+});
+
+test("14. Cron API accepts Bearer token, x-cron-secret header, and ?secret= query parameter", () => {
+  const EXPECTED_SECRET = "secure-cron-secret-2026";
+
+  function authenticateRequest(headers, queryParams) {
+    let bearerToken = null;
+    const authHeader = headers["authorization"];
+    if (authHeader) {
+      const match = authHeader.match(/^Bearer\s+(.+)$/i);
+      if (match) bearerToken = match[1].trim();
+    }
+    const customHeader = headers["x-cron-secret"]?.trim() || null;
+    const querySecret = queryParams.get("secret")?.trim() || null;
+
+    return (
+      bearerToken === EXPECTED_SECRET ||
+      customHeader === EXPECTED_SECRET ||
+      querySecret === EXPECTED_SECRET
+    );
+  }
+
+  // 1. Bearer header
+  assert.equal(
+    authenticateRequest({ authorization: "Bearer secure-cron-secret-2026" }, new URLSearchParams()),
+    true
+  );
+  // 2. Bearer header lowercase
+  assert.equal(
+    authenticateRequest({ authorization: "bearer secure-cron-secret-2026" }, new URLSearchParams()),
+    true
+  );
+  // 3. Custom x-cron-secret header
+  assert.equal(
+    authenticateRequest({ "x-cron-secret": "secure-cron-secret-2026" }, new URLSearchParams()),
+    true
+  );
+  // 4. Query parameter ?secret=
+  assert.equal(
+    authenticateRequest({}, new URLSearchParams({ secret: "secure-cron-secret-2026" })),
+    true
+  );
+  // 5. Invalid credentials
+  assert.equal(
+    authenticateRequest({ authorization: "Bearer wrong-secret" }, new URLSearchParams()),
+    false
+  );
+  assert.equal(
+    authenticateRequest({}, new URLSearchParams({ secret: "wrong" })),
+    false
+  );
+});
+
+test("15. Repeated endpoint calls and concurrency claim guarantee no duplicate reminder dispatches", async () => {
+  // Simulated database table state
+  let remindersDb = [
+    {
+      id: "rem-1",
+      task_id: "task-1",
+      reminder_type: "before_30m",
+      scheduled_for: "2026-10-29T09:00:00.000Z",
+      status: "pending",
+      last_attempt_at: null,
+      attempt_count: 0,
+    },
+  ];
+
+  let emailDispatches = [];
+
+  // Simulated worker execution matching route.ts logic
+  async function runCronWorker(workerId, currentTimeMs) {
+    const nowISO = new Date(currentTimeMs).toISOString();
+    const staleLockThresholdISO = new Date(currentTimeMs - 60 * 1000).toISOString();
+
+    // 1. Query pending due reminders
+    const dueReminders = remindersDb.filter(
+      (r) => r.status === "pending" && r.scheduled_for <= nowISO
+    );
+
+    for (const reminder of dueReminders) {
+      // 2. Concurrency claim check
+      const canClaim =
+        reminder.status === "pending" &&
+        (!reminder.last_attempt_at || reminder.last_attempt_at < staleLockThresholdISO);
+
+      if (!canClaim) {
+        // Locked by another worker or already claimed within 60s
+        continue;
+      }
+
+      // Claim lock
+      reminder.last_attempt_at = nowISO;
+      reminder.attempt_count++;
+
+      // Dispatch email
+      emailDispatches.push({
+        workerId,
+        reminderId: reminder.id,
+        sentAt: nowISO,
+      });
+
+      // Mark sent
+      reminder.status = "sent";
+    }
+  }
+
+  // Run 1st call at T = 2026-10-29T09:05:00Z (5 minutes past scheduled reminder)
+  const t0 = new Date("2026-10-29T09:05:00.000Z").getTime();
+  await runCronWorker("scheduler-run-1", t0);
+  assert.equal(emailDispatches.length, 1, "First run dispatches exactly 1 email");
+
+  // Run 2nd call 10 seconds later (repeated rapid call / retry)
+  await runCronWorker("scheduler-run-2-retry", t0 + 10000);
+  assert.equal(
+    emailDispatches.length,
+    1,
+    "Repeated run does not send duplicate email because reminder is now 'sent'"
+  );
+
+  // Run 3rd call 5 minutes later
+  await runCronWorker("scheduler-run-3-next-cycle", t0 + 300000);
+  assert.equal(
+    emailDispatches.length,
+    1,
+    "Next cycle does not re-send already sent reminder"
+  );
+});

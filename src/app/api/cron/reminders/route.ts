@@ -21,10 +21,15 @@ async function handleReminderCron(request: NextRequest) {
 
   // 1. Authorization Check: Protect cron endpoint with secret
   const authHeader = request.headers.get("authorization");
-  const providedBearerToken = authHeader?.startsWith("Bearer ")
-    ? authHeader.substring(7).trim()
-    : null;
-  const providedQuerySecret = request.nextUrl.searchParams.get("secret");
+  let providedBearerToken: string | null = null;
+  if (authHeader) {
+    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (match) {
+      providedBearerToken = match[1].trim();
+    }
+  }
+  const customHeaderSecret = request.headers.get("x-cron-secret")?.trim() || null;
+  const providedQuerySecret = request.nextUrl.searchParams.get("secret")?.trim() || null;
 
   const expectedSecret =
     process.env.REMINDER_CRON_SECRET?.trim() ||
@@ -34,6 +39,7 @@ async function handleReminderCron(request: NextRequest) {
   if (expectedSecret) {
     const isAuthorized =
       providedBearerToken === expectedSecret ||
+      customHeaderSecret === expectedSecret ||
       providedQuerySecret === expectedSecret;
 
     if (!isAuthorized) {
@@ -204,7 +210,34 @@ async function handleReminderCron(request: NextRequest) {
       continue;
     }
 
-    // Rule D: Send Email Notification
+    // Rule D: Concurrency Lock & Idempotency Claim
+    // Atomically claim the reminder if it is still pending and has not been attempted in the last 60 seconds
+    const lockTime = new Date().toISOString();
+    const staleLockThreshold = new Date(Date.now() - 60 * 1000).toISOString();
+
+    const { data: claimedRows, error: claimErr } = await supabase
+      .from("task_reminders")
+      .update({
+        last_attempt_at: lockTime,
+        attempt_count: (reminder.attempt_count || 0) + 1,
+      })
+      .eq("id", reminder.id)
+      .eq("status", "pending")
+      .or(`last_attempt_at.is.null,last_attempt_at.lt.${staleLockThreshold}`)
+      .select("id");
+
+    if (claimErr || !claimedRows || claimedRows.length === 0) {
+      results.skipped++;
+      results.details.push({
+        reminderId: reminder.id,
+        taskId: reminder.task_id,
+        action: "skipped_locked",
+        reason: "Already in progress by another worker or recently attempted",
+      });
+      continue;
+    }
+
+    // Rule E: Send Email Notification
     const { subject, html } = generateEmailContent(
       parentTask,
       reminder.reminder_type as ReminderType,
@@ -236,7 +269,6 @@ async function handleReminderCron(request: NextRequest) {
             .update({
               status: "sent",
               sent_at: new Date().toISOString(),
-              attempt_count: (reminder.attempt_count || 0) + 1,
               error_message: null,
             })
             .eq("id", reminder.id);
@@ -249,12 +281,11 @@ async function handleReminderCron(request: NextRequest) {
           });
         } else {
           const errData = await response.text();
+          const currentAttempts = (reminder.attempt_count || 0) + 1;
           await supabase
             .from("task_reminders")
             .update({
-              status: reminder.attempt_count >= 2 ? "failed" : "pending", // Retry up to 3 times
-              attempt_count: (reminder.attempt_count || 0) + 1,
-              last_attempt_at: new Date().toISOString(),
+              status: currentAttempts >= 3 ? "failed" : "pending", // Retry up to 3 times
               error_message: `Resend API error (${response.status}): ${errData.substring(0, 300)}`,
             })
             .eq("id", reminder.id);
@@ -268,12 +299,11 @@ async function handleReminderCron(request: NextRequest) {
           });
         }
       } catch (sendErr: any) {
+        const currentAttempts = (reminder.attempt_count || 0) + 1;
         await supabase
           .from("task_reminders")
           .update({
-            status: reminder.attempt_count >= 2 ? "failed" : "pending",
-            attempt_count: (reminder.attempt_count || 0) + 1,
-            last_attempt_at: new Date().toISOString(),
+            status: currentAttempts >= 3 ? "failed" : "pending",
             error_message: `Network error: ${sendErr?.message || "Unknown error"}`,
           })
           .eq("id", reminder.id);
@@ -288,12 +318,9 @@ async function handleReminderCron(request: NextRequest) {
       }
     } else {
       // RESEND_API_KEY is not configured yet (e.g. local environment or pre-configuration)
-      // Log delivery intent and keep reminder pending or mark simulated
       await supabase
         .from("task_reminders")
         .update({
-          attempt_count: (reminder.attempt_count || 0) + 1,
-          last_attempt_at: new Date().toISOString(),
           error_message: "RESEND_API_KEY is not configured in environment.",
         })
         .eq("id", reminder.id);
