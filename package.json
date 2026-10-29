@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/auth-authorization.test.mjs tests/counselor-targets.test.mjs tests/admissions-revenue.test.mjs tests/counselor-master-universities.test.mjs tests/month-targets-and-daily-tracker.test.mjs tests/tasks-and-reminders.test.mjs"
+    "test": "node --test tests/auth-authorization.test.mjs tests/counselor-targets.test.mjs tests/admissions-revenue.test.mjs tests/counselor-master-universities.test.mjs tests/month-targets-and-daily-tracker.test.mjs tests/tasks-and-reminders.test.mjs tests/projections.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.1",

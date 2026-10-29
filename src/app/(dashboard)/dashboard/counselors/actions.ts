@@ -181,7 +181,59 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
       });
     }
 
-    // 4. Merge counselors with month-specific target & actual metrics
+    // 4. Query monthly projections for all counselors
+    const projectionsMap = new Map<string, {
+      total: number;
+      met: number;
+      notMet: number;
+      pending: number;
+      totalRev: number;
+      reviewedRev: number;
+      metRev: number;
+    }>();
+
+    try {
+      const { data: projData, error: projErr } = await supabase
+        .from("projections")
+        .select("id, counselor_id, projected_revenue, status")
+        .gte("projection_date", monthStart)
+        .lte("projection_date", monthEnd);
+
+      if (!projErr && projData) {
+        projData.forEach((p: any) => {
+          const stats = projectionsMap.get(p.counselor_id) || {
+            total: 0,
+            met: 0,
+            notMet: 0,
+            pending: 0,
+            totalRev: 0,
+            reviewedRev: 0,
+            metRev: 0,
+          };
+
+          const rev = Number(p.projected_revenue) || 0;
+          stats.total += 1;
+          stats.totalRev += rev;
+
+          if (p.status === "met") {
+            stats.met += 1;
+            stats.reviewedRev += rev;
+            stats.metRev += rev;
+          } else if (p.status === "not_met") {
+            stats.notMet += 1;
+            stats.reviewedRev += rev;
+          } else {
+            stats.pending += 1;
+          }
+
+          projectionsMap.set(p.counselor_id, stats);
+        });
+      }
+    } catch {
+      // Projections table might not exist yet in local development
+    }
+
+    // 5. Merge counselors with month-specific target & actual metrics
     let activeCounselorsCount = 0;
     let assignedCount = 0;
     let combinedMonthlyTarget = 0;
@@ -207,6 +259,12 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
         isTargetAssigned && effectiveAdmissionTarget > 0
           ? (actualAdmissions / effectiveAdmissionTarget) * 100
           : null;
+
+      // Projection completion calculations
+      const projStats = projectionsMap.get(c.id);
+      const projReviewed = (projStats?.met || 0) + (projStats?.notMet || 0);
+      const projCompletion = projStats && projReviewed > 0 ? (projStats.met / projReviewed) * 100 : null;
+      const projWeighted = projStats && projStats.reviewedRev > 0 ? (projStats.metRev / projStats.reviewedRev) * 100 : null;
 
       if (c.is_active) {
         activeCounselorsCount++;
@@ -235,6 +293,12 @@ export async function getCounselorsWithTargetsAction(monthKey: string): Promise<
         actual_admissions: actualAdmissions,
         achievement_percentage: achievement,
         admission_achievement_percentage: admissionAchievement,
+        projection_total: projStats?.total || 0,
+        projection_met: projStats?.met || 0,
+        projection_not_met: projStats?.notMet || 0,
+        projection_pending: projStats?.pending || 0,
+        projection_completion_percentage: projCompletion,
+        projection_revenue_weighted_percentage: projWeighted,
       };
     });
 

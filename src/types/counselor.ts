@@ -37,6 +37,12 @@ export interface CounselorWithTarget extends Counselor {
   actual_admissions: number | null;
   achievement_percentage: number | null;
   admission_achievement_percentage: number | null;
+  projection_total?: number;
+  projection_met?: number;
+  projection_not_met?: number;
+  projection_pending?: number;
+  projection_completion_percentage?: number | null;
+  projection_revenue_weighted_percentage?: number | null;
 }
 
 export interface CounselorSummary {

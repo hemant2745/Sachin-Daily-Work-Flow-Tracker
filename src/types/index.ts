@@ -17,4 +17,5 @@ export type MetricPlaceholder = {
 
 export * from "./counselor";
 export * from "./admissions";
+export * from "./projections";
 

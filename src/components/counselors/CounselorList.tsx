@@ -547,6 +547,7 @@ export function CounselorList({
                   <th className="py-3 px-3 text-center">Actual Adm.</th>
                   <th className="py-3 px-3 text-center">Collection Ach. %</th>
                   <th className="py-3 px-3 text-center">Adm. Ach. %</th>
+                  <th className="py-3 px-3 text-center">Projection Ach. %</th>
                   <th className="py-3 px-3 text-center">Status</th>
                   <th className="py-3 px-3.5 text-right">Actions</th>
                 </tr>
@@ -692,6 +693,32 @@ export function CounselorList({
                           </span>
                         ) : (
                           <span className="text-[10px] text-amber-700 italic">Target not assigned</span>
+                        )}
+                      </td>
+
+                      {/* Projection Achievement % */}
+                      <td className="py-3 px-3 text-center">
+                        {c.projection_completion_percentage !== null && c.projection_completion_percentage !== undefined ? (
+                          <div className="flex flex-col items-center">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                c.projection_completion_percentage >= 70
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : c.projection_completion_percentage >= 40
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : "bg-rose-50 text-rose-700 border border-rose-200"
+                              }`}
+                              title={`Revenue-Weighted: ${c.projection_revenue_weighted_percentage !== null && c.projection_revenue_weighted_percentage !== undefined ? c.projection_revenue_weighted_percentage.toFixed(1) + '%' : 'N/A'}`}
+                            >
+                              {c.projection_completion_percentage.toFixed(1)}%
+                            </span>
+                            <span className="text-[9px] text-gray-500 mt-0.5">
+                              {c.projection_met || 0}M / {c.projection_not_met || 0}NM
+                              {c.projection_pending ? ` (${c.projection_pending}P)` : ""}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-gray-400 font-medium">N/A</span>
                         )}
                       </td>
 
