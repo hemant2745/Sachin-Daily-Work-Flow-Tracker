@@ -37,8 +37,8 @@ const navigationItems: NavItem[] = [
   { name: "Tasks & Subtasks", href: "/dashboard/tasks", icon: CheckSquare, isImplemented: true },
   { name: "Daily Tracker", href: "/dashboard/daily-tracker", icon: CalendarCheck, isImplemented: true },
   { name: "Projections", href: "/dashboard/projections", icon: TrendingUp, isImplemented: true },
-  { name: "Reports", href: "/dashboard#reports", icon: BarChart3, isImplemented: false },
-  { name: "Settings", href: "/dashboard#settings", icon: Settings, isImplemented: false },
+  { name: "Reports", href: "/dashboard/reports", icon: BarChart3, isImplemented: true },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, isImplemented: true },
 ];
 
 export function Sidebar() {
