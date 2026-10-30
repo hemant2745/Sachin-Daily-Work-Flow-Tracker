@@ -2,6 +2,7 @@ import React from "react";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Header } from "@/components/dashboard/Header";
+import { CreatorCredit } from "@/components/dashboard/CreatorCredit";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { evaluateSessionAccess } from "@/lib/auth/admin";
@@ -38,8 +39,11 @@ export default async function DashboardLayout({
       {/* Main Content Workspace */}
       <div className="flex-1 flex flex-col min-w-0 lg:pl-64 pt-14 lg:pt-0">
         <Header />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
-          {children}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto flex flex-col justify-between">
+          <div className="space-y-6 flex-1">
+            {children}
+          </div>
+          <CreatorCredit />
         </main>
       </div>
     </div>
