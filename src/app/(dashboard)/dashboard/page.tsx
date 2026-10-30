@@ -1,23 +1,24 @@
 import React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { DashboardHeroBanner } from "@/components/dashboard/DashboardHeroBanner";
+import { TeamPerformanceChart } from "@/components/dashboard/TeamPerformanceChart";
+import { QuickActionsCard } from "@/components/dashboard/QuickActionsCard";
+import { MotivationalCard } from "@/components/dashboard/MotivationalCard";
 import {
-  ShieldCheck,
   Users,
   GraduationCap,
   CheckSquare,
   TrendingUp,
   CalendarCheck,
   BarChart3,
-  Settings,
   Clock,
   Sparkles,
-  Info,
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
   PhoneCall,
+  Target,
 } from "lucide-react";
 import { normalizeMonthKey, formatINR, formatMonthDisplay } from "@/lib/format";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -56,6 +57,7 @@ export default async function DashboardPage() {
   const teamAchievementPercentage =
     teamMonthlyTarget > 0 ? (teamRevenueAchieved / teamMonthlyTarget) * 100 : null;
   const totalAdmissionsCount = admissionsRes.summary?.currentMonthAdmissionsCount || 0;
+  const admissionsList = admissionsRes.admissions || [];
 
   // 2. Task Telemetry
   const allTasks = tasksRes.tasks || [];
@@ -66,123 +68,90 @@ export default async function DashboardPage() {
   const todayStr = new Date().toISOString().split("T")[0];
   const now = new Date();
 
-  // Upcoming in next 24 hours & Today
   const todayTasks = allTasks.filter(
     (t) => t.scheduled_date === todayStr && t.status !== "completed" && t.status !== "cancelled"
   );
 
-  // Overdue tasks: scheduled_at < now and not completed/cancelled
   const overdueTasks = allTasks.filter((t) => {
     if (t.status === "completed" || t.status === "cancelled") return false;
     const taskDate = new Date(t.scheduled_at || `${t.scheduled_date}T${t.scheduled_start_time}`);
     return taskDate < now;
   });
 
-  // Next 24 hours tasks
-  const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const upcoming24hTasks = allTasks.filter((t) => {
-    if (t.status === "completed" || t.status === "cancelled") return false;
-    const taskDate = new Date(t.scheduled_at || `${t.scheduled_date}T${t.scheduled_start_time}`);
-    return taskDate >= now && taskDate <= next24h;
-  });
-
   // 3. Projections Telemetry
   const allProjections = projectionsRes.projections || [];
   const pendingProjections = allProjections.filter((p) => p.status === "pending");
   const pendingProjectionsCount = pendingProjections.length;
-
-  // Urgent projection reviews: past date projections still pending review
   const urgentProjections = pendingProjections.filter((p) => p.projection_date < todayStr);
+
+  // 4. Calling Performance Summary
+  const callingSummary = callingRes.summary;
 
   return (
     <div className="space-y-6">
-      {/* Hero Banner Section using Supplied Image */}
-      <section className="bg-navy-950 rounded-2xl overflow-hidden border border-navy-800 shadow-xl relative">
-        <div className="relative w-full aspect-[2048/768] max-h-[280px] sm:max-h-[320px] bg-navy-950 flex items-center justify-center">
-          <Image
-            src="/images/sachin-workflow-hero.png"
-            alt="Sachin Behera - Building Skills, Creating Opportunities for a Better Tomorrow"
-            fill
-            priority
-            sizes="(max-width: 1280px) 100vw, 1200px"
-            className="object-contain sm:object-cover object-center"
-          />
-          {/* Subtle gradient overlay at bottom edge */}
-          <div className="absolute inset-0 bg-gradient-to-t from-navy-950/90 via-transparent to-transparent pointer-events-none" />
+      {/* 1. Main Dashboard Banner (Navy to Royal Blue Gradient, S3 Logo, Mission Statement, Taglines) */}
+      <DashboardHeroBanner />
 
-          {/* Badge top-left */}
-          <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 flex items-center gap-2 bg-navy-950/85 backdrop-blur-md px-3 py-1 rounded-full border border-navy-700/60 text-[11px] text-white">
-            <span className="w-2 h-2 rounded-full bg-brand-orange animate-pulse" />
-            <span className="font-medium">Administrator Workspace Console</span>
-          </div>
-        </div>
-
-        {/* Banner Details Bar */}
-        <div className="px-5 py-3.5 bg-navy-900 border-t border-navy-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center space-x-2 text-gray-300">
-            <ShieldCheck className="w-4 h-4 text-brand-orange shrink-0" />
-            <span className="font-medium text-white">Sachin Behera</span>
-            <span className="text-gray-500">&bull;</span>
-            <span className="text-gray-400">Team Leader, College Vidya</span>
-          </div>
-          <div className="flex items-center space-x-2 text-gray-400">
-            <Sparkles className="w-3.5 h-3.5 text-brand-orange" />
-            <span>Complete Team Workflow Management &bull; Live Telemetry Synchronized</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Real Performance Metrics Cards (Top 6 Live KPIs) */}
+      {/* 2. Team Performance Metrics (Four Key KPI Cards) */}
       <section>
-        <div className="flex items-center justify-between mb-3.5">
-          <h3 className="text-sm font-bold text-navy-800 uppercase tracking-wider">
-            Team Performance Metrics ({monthDisplay})
-          </h3>
-          <span className="text-xs text-brand-orange font-semibold flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            {configured && hasData ? "Live Database Telemetry" : "Awaiting Database Records"}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3.5">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-extrabold text-[#0A2454] uppercase tracking-wider">
+              Team Performance Metrics
+            </h3>
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#0866F5] border border-blue-100">
+              {monthDisplay}
+            </span>
+          </div>
+
+          <span className="text-xs text-[#0866F5] font-semibold flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#00A77B] animate-pulse" />
+            {configured && hasData ? "Live Production Database" : "Awaiting Database Records"}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-          {/* 1. Team Monthly Target */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Team Monthly Target */}
           <MetricCard
             title="Team Monthly Target"
             iconName="target"
             isLive={configured && hasData}
             value={formatINR(teamMonthlyTarget)}
             placeholderValue="Not configured"
-            description={`Aggregated monthly quota for all active team counselors for ${monthDisplay}.`}
-            statusLabel={configured && hasData ? "Active Quota" : "Target Setup Pending"}
+            description={`Aggregated monthly target quota allocated across active counsellors for ${monthDisplay}.`}
+            statusLabel={configured && hasData ? "Active Quota" : "Setup Pending"}
             phaseNote={
               configured && hasData
-                ? `${counselorsRes.summary?.activeCounselors || 0} active counselor(s)`
-                : "Data will appear after setup"
+                ? `${counselorsRes.summary?.activeCounselors || 0} active counsellor(s)`
+                : "Awaiting setup"
             }
+            accentColor="blue"
           />
 
-          {/* 2. Team Revenue Achieved */}
+          {/* Card 2: Team Revenue Achieved */}
           <MetricCard
             title="Team Revenue Achieved"
             iconName="revenue"
             isLive={configured && hasData}
             value={formatINR(teamRevenueAchieved)}
             placeholderValue="Not configured"
-            description={`Total verified admission revenue collected month-to-date across counselors for ${monthDisplay}.`}
-            statusLabel={configured && hasData ? "Verified Ledger" : "Ledger Setup Pending"}
-            phaseNote={configured && hasData ? "Admissions Pipeline" : "Data will appear after setup"}
+            description={`Total verified admission revenue collected month-to-date across counsellors for ${monthDisplay}.`}
+            statusLabel={configured && hasData ? "Verified Ledger" : "Ledger Pending"}
+            phaseNote={configured && hasData ? "Admissions Pipeline" : "Awaiting setup"}
+            accentColor="green"
           />
 
-          {/* 3. Team Achievement Percentage */}
+          {/* Card 3: Team Achievement Percentage */}
           <MetricCard
-            title="Team Achievement Percentage"
+            title="Team Achievement %"
             iconName="percentage"
             isLive={configured && hasData}
             value={
               teamAchievementPercentage !== null ? `${teamAchievementPercentage.toFixed(1)}%` : "N/A"
             }
             placeholderValue="Not configured"
-            description="Computed ratio of achieved team revenue against active monthly target."
+            percentageProgress={teamAchievementPercentage}
+            description="Actual revenue divided by active monthly target. Accurate unscaled percentage."
             statusLabel={
               configured && hasData
                 ? teamAchievementPercentage !== null
@@ -190,196 +159,238 @@ export default async function DashboardPage() {
                   : "Target ₹0 (N/A)"
                 : "Formula Pending"
             }
-            phaseNote={configured && hasData ? "Real-time Achievement" : "Data will appear after setup"}
+            phaseNote={configured && hasData ? "Real-time Tracking" : "Awaiting setup"}
+            accentColor="orange"
           />
 
-          {/* 4. Total Admissions */}
+          {/* Card 4: Total Admissions */}
           <MetricCard
             title="Total Admissions"
             iconName="admissions"
             isLive={configured && hasData}
             value={`${totalAdmissionsCount}`}
             placeholderValue="Not configured"
-            description={`Total count of enrolled students credited to team counselors for ${monthDisplay}.`}
+            description={`Total verified enrolled students credited to team counsellors for ${monthDisplay}.`}
             statusLabel={configured && hasData ? "Verified Enrolled" : "Registry Pending"}
             phaseNote={
               configured && hasData
-                ? `${admissionsRes.summary?.totalAdmissions || 0} lifetime total`
-                : "Data will appear after setup"
+                ? `${admissionsRes.summary?.totalAdmissions || 0} lifetime admissions`
+                : "Awaiting setup"
             }
-          />
-
-          {/* 5. Pending Tasks (Live Database Telemetry) */}
-          <MetricCard
-            title="Pending Tasks"
-            iconName="tasks"
-            isLive={configured && hasData}
-            value={`${pendingTasksCount}`}
-            placeholderValue="0"
-            description="Scheduled action items, subtasks, and automated reminder alerts in active queue."
-            statusLabel={overdueTasks.length > 0 ? `${overdueTasks.length} Overdue` : "Queue Up to Date"}
-            phaseNote={`${todayTasks.length} due today &bull; ${allTasks.length} total tasks`}
-          />
-
-          {/* 6. Pending Projection Reviews (Live Database Telemetry) */}
-          <MetricCard
-            title="Pending Projection Reviews"
-            iconName="projections"
-            isLive={configured && hasData}
-            value={`${pendingProjectionsCount}`}
-            placeholderValue="0"
-            description="Next-day counselor projection forecasts awaiting confirmation."
-            statusLabel={
-              urgentProjections.length > 0
-                ? `${urgentProjections.length} Review Overdue`
-                : "Reviews Current"
-            }
-            phaseNote={`${projectionsRes.overview?.metCount || 0} verified met in ${monthDisplay}`}
+            accentColor="cyan"
           />
         </div>
       </section>
 
-      {/* Today's Calling Performance & APR Telemetry Banner */}
-      {callingRes.summary && (
-        <section className="bg-white border border-surface-border rounded-2xl p-5 shadow-card">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-4 border-b border-gray-100">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-lg bg-navy-50 flex items-center justify-center text-navy-800">
-                <PhoneCall className="w-4 h-4 text-brand-orange" />
+      {/* 3. Featured Calling Performance & APR Telemetry Panel (Prominent Full-Width Section) */}
+      <section className="bg-white border border-[#DFEAFE] rounded-3xl p-6 sm:p-7 shadow-xs hover:shadow-md transition-all">
+        {/* Panel Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 mb-5 border-b border-[#DFEAFE]">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0866F5] to-[#18B9E8] flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+              <PhoneCall className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-black text-[#0A2454]">
+                  Calling Performance & APR Telemetry
+                </h3>
+                <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-[#0866F5] border border-blue-200">
+                  Daily Checkpoint
+                </span>
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-navy-800">Today&apos;s Team Calling Performance & APR</h4>
-                <p className="text-[11px] text-gray-500">
-                  Target benchmarks: 200 calls &bull; 90 min talk-time per counsellor.
-                </p>
-              </div>
+              <p className="text-xs text-[#61789E] mt-0.5">
+                Official Benchmarks: <strong className="text-[#0A2454]">200 calls</strong> &bull; <strong className="text-[#0A2454]">90 mins talk time</strong> per counsellor
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <div className="hidden md:flex flex-col items-end mr-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#61789E]">Team APR Status</span>
+              <span className={`text-xs font-black ${
+                (callingSummary?.averageAPR ?? 0) >= 100 ? "text-[#00A77B]" : "text-[#0866F5]"
+              }`}>
+                {callingSummary?.averageAPR !== null && callingSummary?.averageAPR !== undefined
+                  ? `${callingSummary.averageAPR}% Overall`
+                  : "Awaiting Records"}
+              </span>
             </div>
             <Link
               href="/dashboard/calling-performance"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-brand-orange hover:text-brand-hover"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#0866F5] to-[#1677FF] hover:from-[#0650c5] hover:to-[#0866F5] text-white text-xs sm:text-[13px] font-bold rounded-xl shadow-xs transition-all"
             >
-              <span>Calling Dashboard</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>Calling Console</span>
+              <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
+        </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
-            <div className="p-2.5 rounded-xl bg-surface-light border border-gray-200">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase">Average Team APR</div>
-              <div className="text-base font-bold text-navy-800 mt-0.5">
-                {callingRes.summary.averageAPR !== null ? `${callingRes.summary.averageAPR}%` : "No Submissions"}
+        {/* Telemetry Metric Cards Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          {/* Metric 1: Average APR */}
+          <div className="p-4 rounded-2xl bg-gradient-to-b from-[#F3F8FF] to-white border border-[#DFEAFE] flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-[#0866F5]">
+                  Average APR
+                </span>
+                <span className="w-2 h-2 rounded-full bg-[#0866F5]" />
               </div>
+              <p className="text-2xl sm:text-3xl font-black text-[#0A2454]">
+                {callingSummary?.averageAPR !== null && callingSummary?.averageAPR !== undefined
+                  ? `${callingSummary.averageAPR}%`
+                  : "0.0%"}
+              </p>
             </div>
-
-            <div className="p-2.5 rounded-xl bg-surface-light border border-gray-200">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase">&ge; 100% APR</div>
-              <div className="text-base font-bold text-emerald-600 mt-0.5">
-                {callingRes.summary.acceptableCount} Counsellors
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-surface-light border border-gray-200">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase">&lt; 100% APR</div>
-              <div className="text-base font-bold text-rose-600 mt-0.5">
-                {callingRes.summary.underperformingCount} Counsellors
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-surface-light border border-gray-200">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase">Missing Submissions</div>
-              <div className="text-base font-bold text-amber-600 mt-0.5">
-                {callingRes.summary.missingSubmissions} Pending
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-surface-light border border-gray-200">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase">Highest APR</div>
-              <div className="text-base font-bold text-teal-600 mt-0.5">
-                {callingRes.summary.highestAPR !== null ? `${callingRes.summary.highestAPR}%` : "—"}
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-surface-light border border-gray-200">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase">Lowest APR</div>
-              <div className="text-base font-bold text-purple-600 mt-0.5">
-                {callingRes.summary.lowestAPR !== null ? `${callingRes.summary.lowestAPR}%` : "—"}
-              </div>
-            </div>
+            <p className="text-[11px] text-[#61789E] mt-2 font-medium">
+              50/50 Calls & Talk Time
+            </p>
           </div>
-        </section>
-      )}
 
-      {/* Live Activity & Action Queue Section */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Today & Upcoming Task Queue */}
-        <div className="bg-white border border-surface-border rounded-xl p-5 shadow-card flex flex-col justify-between">
+          {/* Metric 2: Benchmark Met (>=100% APR) */}
+          <div className="p-4 rounded-2xl bg-gradient-to-b from-emerald-50/50 to-white border border-emerald-200/70 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-[#00A77B]">
+                  &ge; 100% APR
+                </span>
+                <span className="w-2 h-2 rounded-full bg-[#00A77B]" />
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-[#00A77B]">
+                {callingSummary?.acceptableCount || 0}
+              </p>
+            </div>
+            <p className="text-[11px] text-[#00A77B] mt-2 font-semibold">
+              Counsellors on target
+            </p>
+          </div>
+
+          {/* Metric 3: Underperforming (<100% APR) */}
+          <div className="p-4 rounded-2xl bg-gradient-to-b from-rose-50/50 to-white border border-rose-200/70 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-[#F04460]">
+                  &lt; 100% APR
+                </span>
+                <span className="w-2 h-2 rounded-full bg-[#F04460]" />
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-[#F04460]">
+                {callingSummary?.underperformingCount || 0}
+              </p>
+            </div>
+            <p className="text-[11px] text-[#F04460] mt-2 font-semibold">
+              Reason required
+            </p>
+          </div>
+
+          {/* Metric 4: Daily Submissions */}
+          <div className="p-4 rounded-2xl bg-gradient-to-b from-amber-50/50 to-white border border-amber-200/70 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-[#FF8A00]">
+                  Submissions
+                </span>
+                <span className="w-2 h-2 rounded-full bg-[#FF8A00]" />
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-[#FF8A00]">
+                {callingSummary?.totalSubmissions || 0}
+                <span className="text-base text-[#61789E] font-medium">/{callingSummary?.expectedSubmissions || 0}</span>
+              </p>
+            </div>
+            <p className="text-[11px] text-[#61789E] mt-2 font-medium">
+              {callingSummary?.missingSubmissions || 0} missing today
+            </p>
+          </div>
+
+          {/* Metric 5: Peak APR Score */}
+          <div className="p-4 rounded-2xl bg-gradient-to-b from-purple-50/50 to-white border border-purple-200/70 flex flex-col justify-between col-span-2 sm:col-span-1">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-purple-600">
+                  Peak APR
+                </span>
+                <span className="w-2 h-2 rounded-full bg-purple-600" />
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-purple-700">
+                {callingSummary?.highestAPR !== null && callingSummary?.highestAPR !== undefined
+                  ? `${callingSummary.highestAPR}%`
+                  : "—"}
+              </p>
+            </div>
+            <p className="text-[11px] text-purple-600 mt-2 font-semibold">
+              Top daily counsellor
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Operational Queues (Pending Tasks and Pending Projections Side-by-Side) */}
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* A. Pending Tasks Card */}
+        <div className="bg-white border border-[#DFEAFE] rounded-2xl p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-                  <CheckSquare className="w-4 h-4" />
+            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#DFEAFE]">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-[#0866F5]/10 flex items-center justify-center text-[#0866F5]">
+                  <CheckSquare className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-navy-800">Today & Upcoming Task Queue</h4>
-                  <p className="text-[11px] text-gray-500">
-                    Tasks scheduled for today or needing urgent attention.
-                  </p>
+                  <h4 className="text-sm sm:text-base font-bold text-[#0A2454]">Pending Tasks</h4>
+                  <p className="text-xs text-[#61789E]">Active queue and automated alerts</p>
                 </div>
               </div>
-              {overdueTasks.length > 0 && (
-                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3" /> {overdueTasks.length} Overdue
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-black text-[#0A2454]">
+                  {pendingTasksCount}
                 </span>
-              )}
+                {overdueTasks.length > 0 && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-[#F04460] border border-rose-200 flex items-center gap-1 animate-pulse">
+                    <AlertTriangle className="w-3 h-3" /> {overdueTasks.length} Overdue
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Task Item List */}
+            {/* Tasks Preview List */}
             <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-              {todayTasks.length === 0 && overdueTasks.length === 0 && upcoming24hTasks.length === 0 ? (
-                <div className="text-center py-8 border-2 border-dashed border-gray-100 rounded-lg">
-                  <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-gray-700">All Tasks Up to Date</p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
-                    No overdue or pending tasks scheduled for the next 24 hours.
-                  </p>
+              {todayTasks.length === 0 && overdueTasks.length === 0 ? (
+                <div className="text-center py-8 border border-dashed border-[#DFEAFE] rounded-xl bg-[#F3F8FF]/50">
+                  <CheckCircle2 className="w-8 h-8 text-[#00A77B] mx-auto mb-2" />
+                  <p className="text-xs font-bold text-[#0A2454]">Task Queue Clear</p>
+                  <p className="text-[11px] text-[#61789E]">No urgent tasks overdue or pending today.</p>
                 </div>
               ) : (
                 <>
-                  {/* Overdue Items */}
                   {overdueTasks.slice(0, 3).map((t) => (
                     <div
                       key={t.id}
-                      className="p-2.5 rounded-lg bg-rose-50/60 border border-rose-200/80 flex items-center justify-between text-xs"
+                      className="p-3 rounded-xl bg-rose-50/70 border border-rose-200/80 flex items-center justify-between text-xs"
                     >
-                      <div className="min-w-0 pr-2">
-                        <div className="font-semibold text-rose-900 truncate">{t.title}</div>
-                        <div className="text-[11px] text-rose-600 flex items-center gap-2 mt-0.5">
-                          <span>Due: {t.scheduled_date} at {t.scheduled_start_time}</span>
-                          {t.counselor && <span>&bull; {t.counselor.full_name}</span>}
-                        </div>
+                      <div className="min-w-0 pr-3">
+                        <p className="font-bold text-rose-950 truncate">{t.title}</p>
+                        <p className="text-[11px] text-[#F04460] mt-0.5">
+                          Overdue: {t.scheduled_date} at {t.scheduled_start_time}
+                        </p>
                       </div>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-200/80 text-rose-800 shrink-0 uppercase">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F04460] text-white shrink-0 uppercase">
                         Overdue
                       </span>
                     </div>
                   ))}
 
-                  {/* Today's Tasks */}
                   {todayTasks.slice(0, 3).map((t) => (
                     <div
                       key={t.id}
-                      className="p-2.5 rounded-lg bg-surface-light border border-gray-200 flex items-center justify-between text-xs hover:border-gray-300 transition-colors"
+                      className="p-3 rounded-xl bg-[#F3F8FF] border border-[#DFEAFE] flex items-center justify-between text-xs"
                     >
-                      <div className="min-w-0 pr-2">
-                        <div className="font-semibold text-navy-800 truncate">{t.title}</div>
-                        <div className="text-[11px] text-gray-500 flex items-center gap-2 mt-0.5">
-                          <span>Today at {t.scheduled_start_time}</span>
-                          <span className="uppercase text-[10px] font-semibold text-brand-orange">
-                            {t.priority}
-                          </span>
-                        </div>
+                      <div className="min-w-0 pr-3">
+                        <p className="font-semibold text-[#0A2454] truncate">{t.title}</p>
+                        <p className="text-[11px] text-[#61789E] mt-0.5">
+                          Due today &bull; {t.priority}
+                        </p>
                       </div>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-[#0866F5] border border-blue-100 shrink-0 capitalize">
                         {t.status.replace("_", " ")}
                       </span>
                     </div>
@@ -389,65 +400,63 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <div className="pt-3 border-t border-gray-100 mt-3">
+          <div className="pt-3.5 border-t border-[#DFEAFE] mt-4">
             <Link
               href="/dashboard/tasks"
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-surface-light hover:bg-gray-100 text-navy-800 text-xs font-semibold rounded-lg border border-gray-200 transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-[#F3F8FF] hover:bg-blue-50 text-[#0866F5] text-xs sm:text-[13px] font-bold rounded-xl border border-[#DFEAFE] transition-colors"
             >
-              <span>Manage All Tasks & Reminders</span>
+              <span>Manage Tasks & Subtasks</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
 
-        {/* Projection Review Queue */}
-        <div className="bg-white border border-surface-border rounded-xl p-5 shadow-card flex flex-col justify-between">
+        {/* B. Pending Projection Reviews Card */}
+        <div className="bg-white border border-[#DFEAFE] rounded-2xl p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                  <TrendingUp className="w-4 h-4" />
+            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#DFEAFE]">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-[#00A77B]/10 flex items-center justify-center text-[#00A77B]">
+                  <TrendingUp className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-navy-800">Projection Evaluation Queue</h4>
-                  <p className="text-[11px] text-gray-500">
-                    Counsellor forecast evaluations and completion tracking.
-                  </p>
+                  <h4 className="text-sm sm:text-base font-bold text-[#0A2454]">Pending Projections</h4>
+                  <p className="text-xs text-[#61789E]">Forecast evaluations & verification</p>
                 </div>
               </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                {pendingProjectionsCount} Pending
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-black text-[#0A2454]">
+                  {pendingProjectionsCount}
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-[#00A77B] border border-emerald-200">
+                  Reviews
+                </span>
+              </div>
             </div>
 
+            {/* Projections Preview List */}
             <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
               {pendingProjections.length === 0 ? (
-                <div className="text-center py-8 border-2 border-dashed border-gray-100 rounded-lg">
-                  <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-gray-700">All Projections Evaluated</p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
-                    No pending forecasts awaiting status confirmation.
-                  </p>
+                <div className="text-center py-8 border border-dashed border-[#DFEAFE] rounded-xl bg-[#F3F8FF]/50">
+                  <CheckCircle2 className="w-8 h-8 text-[#00A77B] mx-auto mb-2" />
+                  <p className="text-xs font-bold text-[#0A2454]">All Projections Evaluated</p>
+                  <p className="text-[11px] text-[#61789E]">No pending forecasts awaiting status confirmation.</p>
                 </div>
               ) : (
-                pendingProjections.slice(0, 4).map((p) => (
+                pendingProjections.slice(0, 3).map((p) => (
                   <div
                     key={p.id}
-                    className="p-2.5 rounded-lg bg-surface-light border border-gray-200 flex items-center justify-between text-xs hover:border-gray-300 transition-colors"
+                    className="p-3 rounded-xl bg-[#F3F8FF] border border-[#DFEAFE] flex items-center justify-between text-xs"
                   >
-                    <div className="min-w-0 pr-2">
-                      <div className="font-semibold text-navy-800 truncate">
+                    <div className="min-w-0 pr-3">
+                      <p className="font-semibold text-[#0A2454] truncate">
                         {p.counselor?.full_name || "Assigned Counsellor"}
-                      </div>
-                      <div className="text-[11px] text-gray-500 flex items-center gap-2 mt-0.5">
-                        <span>Date: {p.projection_date}</span>
-                        <span>&bull;</span>
-                        <span className="text-brand-orange font-medium">
-                          {formatINR(p.projected_revenue)}
-                        </span>
-                      </div>
+                      </p>
+                      <p className="text-[11px] text-[#61789E] mt-0.5">
+                        {p.projection_date} &bull; <span className="font-bold text-[#FF8A00]">{formatINR(p.projected_revenue)}</span>
+                      </p>
                     </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-[#FF8A00] border border-amber-200 shrink-0">
                       Needs Review
                     </span>
                   </div>
@@ -456,186 +465,37 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <div className="pt-3 border-t border-gray-100 mt-3">
+          <div className="pt-3.5 border-t border-[#DFEAFE] mt-4">
             <Link
               href="/dashboard/projections"
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-surface-light hover:bg-gray-100 text-navy-800 text-xs font-semibold rounded-lg border border-gray-200 transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-[#F3F8FF] hover:bg-emerald-50 text-[#00A77B] text-xs sm:text-[13px] font-bold rounded-xl border border-[#DFEAFE] transition-colors"
             >
-              <span>Review Projections & Conversion</span>
+              <span>Review Projections</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Production Operational Modules Directory Grid */}
-      <section className="pt-2">
-        <h3 className="text-sm font-bold text-navy-800 uppercase tracking-wider mb-3.5">
-          Operational Management Modules
-        </h3>
+      {/* 4. Analytics and Quick Actions (Three Columns: Trend Chart, Quick Actions, Motivational Card) */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Column A: Team Performance Trend Chart */}
+        <div className="lg:col-span-1">
+          <TeamPerformanceChart
+            admissions={admissionsList}
+            monthlyTarget={teamMonthlyTarget}
+            monthKey={currentMonthKey}
+          />
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* 1. Counselor Management */}
-          <Link
-            href="/dashboard/counselors"
-            className="group bg-white border border-surface-border hover:border-brand-orange rounded-xl p-4 shadow-card hover:shadow-cardHover transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-navy-50 group-hover:bg-brand-orange/10 flex items-center justify-center text-navy-800 group-hover:text-brand-orange transition-colors">
-                  <Users className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Production Active
-                </span>
-              </div>
-              <h4 className="text-xs font-bold text-navy-800 group-hover:text-brand-orange transition-colors">
-                Counselor Management
-              </h4>
-              <p className="text-[11px] text-gray-500 mt-1">
-                Configure quotas, adjust monthly targets, and track individual progress.
-              </p>
-            </div>
-            <div className="mt-3 flex items-center text-xs font-semibold text-brand-orange gap-1 group-hover:translate-x-1 transition-transform">
-              <span>Open Roster</span>
-              <ArrowRight className="w-3 h-3" />
-            </div>
-          </Link>
+        {/* Column B: Quick Actions */}
+        <div className="lg:col-span-1">
+          <QuickActionsCard />
+        </div>
 
-          {/* 2. Admissions Pipeline */}
-          <Link
-            href="/dashboard/admissions"
-            className="group bg-white border border-surface-border hover:border-brand-orange rounded-xl p-4 shadow-card hover:shadow-cardHover transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-navy-50 group-hover:bg-brand-orange/10 flex items-center justify-center text-navy-800 group-hover:text-brand-orange transition-colors">
-                  <GraduationCap className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Production Active
-                </span>
-              </div>
-              <h4 className="text-xs font-bold text-navy-800 group-hover:text-brand-orange transition-colors">
-                Admissions & Collections
-              </h4>
-              <p className="text-[11px] text-gray-500 mt-1">
-                Enrollment registry, verified fee collections, and automatic financial attribution.
-              </p>
-            </div>
-            <div className="mt-3 flex items-center text-xs font-semibold text-brand-orange gap-1 group-hover:translate-x-1 transition-transform">
-              <span>Manage Admissions</span>
-              <ArrowRight className="w-3 h-3" />
-            </div>
-          </Link>
-
-          {/* 3. Daily Tracker */}
-          <Link
-            href="/dashboard/daily-tracker"
-            className="group bg-white border border-surface-border hover:border-brand-orange rounded-xl p-4 shadow-card hover:shadow-cardHover transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-navy-50 group-hover:bg-brand-orange/10 flex items-center justify-center text-navy-800 group-hover:text-brand-orange transition-colors">
-                  <CalendarCheck className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Production Active
-                </span>
-              </div>
-              <h4 className="text-xs font-bold text-navy-800 group-hover:text-brand-orange transition-colors">
-                Daily Calendar Tracker
-              </h4>
-              <p className="text-[11px] text-gray-500 mt-1">
-                31-day team matrix, confirmed zero days, and consecutive zero streaks.
-              </p>
-            </div>
-            <div className="mt-3 flex items-center text-xs font-semibold text-brand-orange gap-1 group-hover:translate-x-1 transition-transform">
-              <span>View Daily Matrix</span>
-              <ArrowRight className="w-3 h-3" />
-            </div>
-          </Link>
-
-          {/* 4. Task Management */}
-          <Link
-            href="/dashboard/tasks"
-            className="group bg-white border border-surface-border hover:border-brand-orange rounded-xl p-4 shadow-card hover:shadow-cardHover transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-navy-50 group-hover:bg-brand-orange/10 flex items-center justify-center text-navy-800 group-hover:text-brand-orange transition-colors">
-                  <CheckSquare className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Production Active
-                </span>
-              </div>
-              <h4 className="text-xs font-bold text-navy-800 group-hover:text-brand-orange transition-colors">
-                Tasks & Reminders
-              </h4>
-              <p className="text-[11px] text-gray-500 mt-1">
-                Subtasks, 6-stage email dispatches, and priority tracking.
-              </p>
-            </div>
-            <div className="mt-3 flex items-center text-xs font-semibold text-brand-orange gap-1 group-hover:translate-x-1 transition-transform">
-              <span>Open Task Manager</span>
-              <ArrowRight className="w-3 h-3" />
-            </div>
-          </Link>
-
-          {/* 5. Daily Projections */}
-          <Link
-            href="/dashboard/projections"
-            className="group bg-white border border-surface-border hover:border-brand-orange rounded-xl p-4 shadow-card hover:shadow-cardHover transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-navy-50 group-hover:bg-brand-orange/10 flex items-center justify-center text-navy-800 group-hover:text-brand-orange transition-colors">
-                  <TrendingUp className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Production Active
-                </span>
-              </div>
-              <h4 className="text-xs font-bold text-navy-800 group-hover:text-brand-orange transition-colors">
-                Daily Projections
-              </h4>
-              <p className="text-[11px] text-gray-500 mt-1">
-                Daily revenue forecasts, next-day evaluation reviews, and conversion metrics.
-              </p>
-            </div>
-            <div className="mt-3 flex items-center text-xs font-semibold text-brand-orange gap-1 group-hover:translate-x-1 transition-transform">
-              <span>Evaluate Projections</span>
-              <ArrowRight className="w-3 h-3" />
-            </div>
-          </Link>
-
-          {/* 6. Reports & Analytics */}
-          <Link
-            href="/dashboard/reports"
-            className="group bg-white border border-surface-border hover:border-brand-orange rounded-xl p-4 shadow-card hover:shadow-cardHover transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-navy-50 group-hover:bg-brand-orange/10 flex items-center justify-center text-navy-800 group-hover:text-brand-orange transition-colors">
-                  <BarChart3 className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Production Active
-                </span>
-              </div>
-              <h4 className="text-xs font-bold text-navy-800 group-hover:text-brand-orange transition-colors">
-                Reports & Analytics
-              </h4>
-              <p className="text-[11px] text-gray-500 mt-1">
-                Multi-month target aggregations, university breakdown, Excel and RFC-4180 CSV exports.
-              </p>
-            </div>
-            <div className="mt-3 flex items-center text-xs font-semibold text-brand-orange gap-1 group-hover:translate-x-1 transition-transform">
-              <span>View Executive Reports</span>
-              <ArrowRight className="w-3 h-3" />
-            </div>
-          </Link>
+        {/* Column C: Motivational Card */}
+        <div className="lg:col-span-1">
+          <MotivationalCard />
         </div>
       </section>
     </div>

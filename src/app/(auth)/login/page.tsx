@@ -2,6 +2,7 @@ import React, { Suspense } from "react";
 import Image from "next/image";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Shield, Sparkles, Building2, CheckCircle2 } from "lucide-react";
+import { S3Logo } from "@/components/ui/S3Logo";
 
 export default function LoginPage() {
   return (
@@ -9,19 +10,7 @@ export default function LoginPage() {
       {/* Top Header Bar */}
       <header className="border-b border-navy-800 bg-navy-900/60 backdrop-blur-md sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-lg bg-navy-800 border border-brand-orange/40 flex items-center justify-center text-brand-orange font-bold text-base shadow-sm">
-              SB
-            </div>
-            <div>
-              <h1 className="text-sm sm:text-base font-semibold text-white tracking-tight">
-                Sachin Behera Daily Workflow
-              </h1>
-              <p className="text-[11px] text-gray-400 font-medium">
-                Team Leader Portal &bull; College Vidya
-              </p>
-            </div>
-          </div>
+          <S3Logo size="md" variant="dark" subtitle="Team Leader Portal • College Vidya" />
           <div className="hidden sm:flex items-center space-x-2 text-xs text-gray-400 bg-navy-900 px-3 py-1.5 rounded-full border border-navy-800">
             <Shield className="w-3.5 h-3.5 text-brand-orange" />
             <span>Private Single-Administrator System</span>

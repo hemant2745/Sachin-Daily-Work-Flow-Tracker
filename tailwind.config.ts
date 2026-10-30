@@ -10,28 +10,59 @@ const config: Config = {
     extend: {
       colors: {
         navy: {
-          950: "#09121B",
-          900: "#0E1A26",
-          800: "#142536", // Primary specified dark navy
-          700: "#1D3248",
-          600: "#27415D",
-          500: "#36577B",
-          400: "#50759E",
-          300: "#7F9CBF",
-          200: "#B6C9DE",
-          100: "#E3EBF3",
-          50: "#F2F6FA",
+          950: "#001A3D", // Deep Navy
+          900: "#061B3D", // Navy
+          800: "#0A2454", // Primary specified text navy
+          700: "#133166",
+          600: "#1E427B",
+          500: "#2B5697",
+          400: "#4D77B8",
+          300: "#7CA1D8",
+          200: "#B9CEF2",
+          100: "#DFEAFE", // Fine Border
+          50: "#F3F8FF",  // Main Background
         },
         brand: {
-          orange: "#FF7A00", // Primary specified orange
-          hover: "#E86B00",
+          orange: "#FF8A00", // Vibrant Orange
+          hover: "#E67A00",
           light: "#FFF4EB",
           muted: "#FFA856",
         },
+        royal: {
+          DEFAULT: "#0866F5", // Royal Blue
+          50: "#EBF3FF",
+          100: "#D6E6FF",
+          200: "#ADD0FF",
+          300: "#70AAFF",
+          400: "#3888FF",
+          500: "#0866F5", // Royal Blue
+          600: "#1677FF", // Bright Blue
+          700: "#0047C7",
+        },
+        cyan: {
+          DEFAULT: "#18B9E8",
+          400: "#33CCF5",
+          500: "#18B9E8",
+        },
+        accent: {
+          navy: "#061B3D",
+          deepNavy: "#001A3D",
+          royal: "#0866F5",
+          brightBlue: "#1677FF",
+          cyan: "#18B9E8",
+          orange: "#FF8A00",
+          bg: "#F3F8FF",
+          border: "#DFEAFE",
+          text: "#0A2454",
+          muted: "#61789E",
+          success: "#00A77B",
+          warning: "#FF9F1C",
+          danger: "#F04460",
+        },
         surface: {
-          light: "#F3F5F7", // Primary specified light gray
+          light: "#F3F8FF", // Primary background
           card: "#FFFFFF",
-          border: "#E2E8F0",
+          border: "#DFEAFE", // Fine border
         },
       },
       fontFamily: {
