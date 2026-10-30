@@ -11,13 +11,19 @@ export function CreatorCredit() {
           <span>College Vidya</span>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-surface-border shadow-xs hover:border-blue-300 transition-colors">
-          <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0 animate-pulse" />
+        <a
+          href="https://www.linkedin.com/in/hemant-jha-71977b21b/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Visit Hemant Jha's LinkedIn profile"
+          className="group inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-surface-border shadow-xs hover:border-blue-400 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all cursor-pointer"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0 group-hover:scale-110 transition-transform animate-pulse" />
           <span className="text-gray-500 font-normal">Created by</span>
-          <span className="font-semibold text-blue-600 tracking-tight">
+          <span className="font-semibold text-blue-600 group-hover:text-blue-700 tracking-tight transition-colors">
             Hemant Jha
           </span>
-        </div>
+        </a>
       </div>
     </footer>
   );
