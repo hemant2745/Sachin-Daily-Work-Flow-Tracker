@@ -159,6 +159,49 @@ export function DailyCellModal({
             )}
           </div>
 
+          {/* Calling Performance Checkpoint on this Date */}
+          {cellData.callingPerformance && (
+            <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-navy-900">
+                <span>Daily Calling Checkpoint & APR</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                    cellData.callingPerformance.apr_percent >= 100
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-rose-100 text-rose-800"
+                  }`}
+                >
+                  APR: {cellData.callingPerformance.apr_percent}%
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="bg-white p-2 rounded-lg border border-blue-100">
+                  <div className="text-[10px] text-gray-500">Calls (Target: 200)</div>
+                  <div className="font-bold text-navy-800">
+                    {cellData.callingPerformance.calls_made} ({cellData.callingPerformance.calls_connected} conn)
+                  </div>
+                </div>
+                <div className="bg-white p-2 rounded-lg border border-blue-100">
+                  <div className="text-[10px] text-gray-500">Talk Time (Target: 90m)</div>
+                  <div className="font-bold text-navy-800">{cellData.callingPerformance.talk_time_minutes}m</div>
+                </div>
+                <div className="bg-white p-2 rounded-lg border border-blue-100">
+                  <div className="text-[10px] text-gray-500">Follow-ups</div>
+                  <div className="font-bold text-navy-800">{cellData.callingPerformance.follow_ups}</div>
+                </div>
+                <div className="bg-white p-2 rounded-lg border border-blue-100">
+                  <div className="text-[10px] text-gray-500">Admissions Conv</div>
+                  <div className="font-bold text-emerald-700">{cellData.callingPerformance.admissions_converted}</div>
+                </div>
+              </div>
+              {cellData.callingPerformance.apr_reason && (
+                <div className="text-[11px] text-rose-700 pt-1">
+                  <span className="font-semibold">Underperformance Reason:</span> {cellData.callingPerformance.apr_reason}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Genuine Admissions Details */}
           {hasAdmissions ? (
             <div className="space-y-2">

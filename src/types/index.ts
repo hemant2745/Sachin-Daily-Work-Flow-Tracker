@@ -20,4 +20,5 @@ export * from "./admissions";
 export * from "./projections";
 export * from "./reports";
 export * from "./settings";
+export * from "./calling";
 

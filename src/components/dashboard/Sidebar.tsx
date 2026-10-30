@@ -18,6 +18,7 @@ import {
   LogOut,
   Shield,
   Sparkles,
+  PhoneCall,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/app/auth/actions";
@@ -36,6 +37,7 @@ const navigationItems: NavItem[] = [
   { name: "Universities", href: "/dashboard/universities", icon: Building2, isImplemented: true },
   { name: "Tasks & Subtasks", href: "/dashboard/tasks", icon: CheckSquare, isImplemented: true },
   { name: "Daily Tracker", href: "/dashboard/daily-tracker", icon: CalendarCheck, isImplemented: true },
+  { name: "Calling Performance", href: "/dashboard/calling-performance", icon: PhoneCall, isImplemented: true },
   { name: "Projections", href: "/dashboard/projections", icon: TrendingUp, isImplemented: true },
   { name: "Reports", href: "/dashboard/reports", icon: BarChart3, isImplemented: true },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, isImplemented: true },
@@ -158,12 +160,12 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Phase Status Banner in Sidebar */}
+        {/* System Status Banner in Sidebar */}
         <div className="p-3 mx-3 mb-3 rounded-lg bg-navy-900/80 border border-navy-800">
           <div className="flex items-start gap-2">
             <Sparkles className="w-3.5 h-3.5 text-brand-orange mt-0.5 shrink-0" />
             <div className="text-[11px] text-gray-300 leading-snug">
-              <span className="font-semibold text-white">Phase 3:</span> Counselor Management & Monthly Target Tracking active.
+              <span className="font-semibold text-white">Production Suite:</span> Complete Team Management System &bull; Live Telemetry
             </div>
           </div>
         </div>

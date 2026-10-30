@@ -32,6 +32,14 @@ export interface OverallPerformanceSummary {
   projectionPending: number;
   projectionCompletionPercentage: number | null;
   projectionRevenueWeightedPercentage: number | null;
+  // Calling Performance Aggregates
+  totalCallsMade?: number;
+  totalCallsConnected?: number;
+  totalTalkTimeMinutes?: number;
+  totalFollowUps?: number;
+  averageAPR?: number | null;
+  acceptableAPRCount?: number;
+  underperformingAPRCount?: number;
 }
 
 export interface CounselorReportItem {
@@ -53,6 +61,13 @@ export interface CounselorReportItem {
   reviewedProjectedRevenue: number;
   metProjectedRevenue: number;
   revenueWeightedPercentage: number | null;
+  // Calling aggregates per counsellor
+  totalCallsMade?: number;
+  totalTalkTimeMinutes?: number;
+  totalFollowUps?: number;
+  averageAPR?: number | null;
+  acceptableAPRDays?: number;
+  underperformingAPRDays?: number;
 }
 
 export interface UniversityReportItem {

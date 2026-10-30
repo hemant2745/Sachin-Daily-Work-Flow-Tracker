@@ -118,12 +118,17 @@ export function generateCSVReport(data: ComprehensiveReportData): string {
         : "N/A"
     }`
   );
+  if (data.summary.averageAPR !== undefined) {
+    lines.push(`Total Calls Made,${escapeCSV(data.summary.totalCallsMade || 0)}`);
+    lines.push(`Total Talk Time (Minutes),${escapeCSV(data.summary.totalTalkTimeMinutes || 0)}`);
+    lines.push(`Average Team APR,${data.summary.averageAPR !== null ? `${data.summary.averageAPR}%` : "N/A"}`);
+  }
   lines.push("");
 
   // Counsellor Performance Table
   lines.push("=== COUNSELLOR PERFORMANCE BREAKDOWN ===");
   lines.push(
-    "Counselor Name,Employee Code,Collection Target,Actual Collections,Collection Ach %,Admission Target,Actual Admissions,Adm Ach %,Projections Total,Projections Met,Projections Not Met,Projections Pending,Projection Ach %,Revenue-Weighted %"
+    "Counselor Name,Employee Code,Collection Target,Actual Collections,Collection Ach %,Admission Target,Actual Admissions,Adm Ach %,Projections Total,Projections Met,Projections Not Met,Projections Pending,Projection Ach %,Revenue-Weighted %,Calls Made,Talk Time (Mins),Follow-ups,Average APR %"
   );
   data.counselors.forEach((c) => {
     lines.push(
@@ -150,6 +155,10 @@ export function generateCSVReport(data: ComprehensiveReportData): string {
         c.revenueWeightedPercentage !== null
           ? `${c.revenueWeightedPercentage.toFixed(1)}%`
           : "N/A",
+        c.totalCallsMade ?? 0,
+        c.totalTalkTimeMinutes ?? 0,
+        c.totalFollowUps ?? 0,
+        c.averageAPR !== null && c.averageAPR !== undefined ? `${c.averageAPR}%` : "N/A",
       ].join(",")
     );
   });
@@ -263,6 +272,19 @@ export function generateExcelXMLReport(data: ComprehensiveReportData): string {
     <Cell><Data ss:Type="String">Revenue-Weighted Projection %</Data></Cell>
     <Cell><Data ss:Type="String">${data.summary.projectionRevenueWeightedPercentage !== null ? data.summary.projectionRevenueWeightedPercentage.toFixed(1) + "%" : "N/A"}</Data></Cell>
    </Row>
+   ${data.summary.averageAPR !== undefined ? `
+   <Row>
+    <Cell><Data ss:Type="String">Total Calls Made</Data></Cell>
+    <Cell><Data ss:Type="Number">${data.summary.totalCallsMade || 0}</Data></Cell>
+   </Row>
+   <Row>
+    <Cell><Data ss:Type="String">Total Talk Time (Minutes)</Data></Cell>
+    <Cell><Data ss:Type="Number">${data.summary.totalTalkTimeMinutes || 0}</Data></Cell>
+   </Row>
+   <Row>
+    <Cell><Data ss:Type="String">Average Team APR</Data></Cell>
+    <Cell><Data ss:Type="String">${data.summary.averageAPR !== null ? data.summary.averageAPR + "%" : "N/A"}</Data></Cell>
+   </Row>` : ""}
    <Row></Row>
 
    <!-- Counsellors Table -->
@@ -279,6 +301,10 @@ export function generateExcelXMLReport(data: ComprehensiveReportData): string {
     <Cell ss:StyleID="Header"><Data ss:Type="String">Proj Total</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Proj Ach %</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Revenue-Weighted %</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Calls Made</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Talk Time (Mins)</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Follow-ups</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Average APR %</Data></Cell>
    </Row>
    ${data.counselors.map((c) => `
    <Row>
@@ -294,6 +320,10 @@ export function generateExcelXMLReport(data: ComprehensiveReportData): string {
     <Cell><Data ss:Type="Number">${c.projectionsTotal}</Data></Cell>
     <Cell><Data ss:Type="String">${c.projectionCompletionPercentage !== null ? c.projectionCompletionPercentage.toFixed(1) + "%" : "N/A"}</Data></Cell>
     <Cell><Data ss:Type="String">${c.revenueWeightedPercentage !== null ? c.revenueWeightedPercentage.toFixed(1) + "%" : "N/A"}</Data></Cell>
+    <Cell><Data ss:Type="Number">${c.totalCallsMade ?? 0}</Data></Cell>
+    <Cell><Data ss:Type="Number">${c.totalTalkTimeMinutes ?? 0}</Data></Cell>
+    <Cell><Data ss:Type="Number">${c.totalFollowUps ?? 0}</Data></Cell>
+    <Cell><Data ss:Type="String">${c.averageAPR !== null && c.averageAPR !== undefined ? `${c.averageAPR}%` : "N/A"}</Data></Cell>
    </Row>`).join("")}
   </Table>
  </Worksheet>

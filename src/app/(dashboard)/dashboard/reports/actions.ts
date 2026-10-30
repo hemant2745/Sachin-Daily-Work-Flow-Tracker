@@ -211,6 +211,87 @@ export async function getComprehensiveReportsAction(
     }
     const projections = rawProjections || [];
 
+    // 4b. Fetch Calling Performance Checkpoints
+    let callingQuery = supabase
+      .from("counselor_calling_checkpoints")
+      .select("counselor_id, checkpoint_date, calls_made, calls_connected, talk_time_minutes, follow_ups, admissions_converted, apr_percent, apr_reason")
+      .gte("checkpoint_date", startDate)
+      .lte("checkpoint_date", endDate);
+
+    if (activeFilters.counselorId && activeFilters.counselorId !== "ALL") {
+      callingQuery = callingQuery.eq("counselor_id", activeFilters.counselorId);
+    }
+
+    const { data: rawCalling } = await callingQuery;
+    const callingRecords = rawCalling || [];
+
+    const callingByCounselor = new Map<
+      string,
+      {
+        callsMade: number;
+        talkTime: number;
+        followUps: number;
+        aprSum: number;
+        submissions: number;
+        acceptableDays: number;
+        underperformingDays: number;
+      }
+    >();
+
+    let totalTeamCallsMade = 0;
+    let totalTeamCallsConnected = 0;
+    let totalTeamTalkTime = 0;
+    let totalTeamFollowUps = 0;
+    let totalTeamAPRSum = 0;
+    let acceptableAPRCount = 0;
+    let underperformingAPRCount = 0;
+
+    callingRecords.forEach((cRecord) => {
+      const calls = Number(cRecord.calls_made) || 0;
+      const conn = Number(cRecord.calls_connected) || 0;
+      const tt = Number(cRecord.talk_time_minutes) || 0;
+      const fu = Number(cRecord.follow_ups) || 0;
+      const apr = Number(cRecord.apr_percent) || 0;
+
+      totalTeamCallsMade += calls;
+      totalTeamCallsConnected += conn;
+      totalTeamTalkTime += tt;
+      totalTeamFollowUps += fu;
+      totalTeamAPRSum += apr;
+
+      if (apr >= 100) {
+        acceptableAPRCount += 1;
+      } else {
+        underperformingAPRCount += 1;
+      }
+
+      const cId = cRecord.counselor_id;
+      if (cId) {
+        const prev = callingByCounselor.get(cId) || {
+          callsMade: 0,
+          talkTime: 0,
+          followUps: 0,
+          aprSum: 0,
+          submissions: 0,
+          acceptableDays: 0,
+          underperformingDays: 0,
+        };
+        prev.callsMade += calls;
+        prev.talkTime += tt;
+        prev.followUps += fu;
+        prev.aprSum += apr;
+        prev.submissions += 1;
+        if (apr >= 100) prev.acceptableDays += 1;
+        else prev.underperformingDays += 1;
+        callingByCounselor.set(cId, prev);
+      }
+    });
+
+    const averageTeamAPR =
+      callingRecords.length > 0
+        ? Number((totalTeamAPRSum / callingRecords.length).toFixed(2))
+        : null;
+
     // 5. Aggregate Admissions per Counselor & University & Date
     const admissionsByCounselor = new Map<string, { count: number; revenue: number }>();
     const admissionsByUniversity = new Map<string, { count: number; revenue: number }>();
@@ -362,6 +443,12 @@ export async function getComprehensiveReportsAction(
       const admPct =
         admissionTarget > 0 ? Number(((adm.count / admissionTarget) * 100).toFixed(1)) : null;
 
+      const callStats = callingByCounselor.get(c.id);
+      const counselorAvgAPR =
+        callStats && callStats.submissions > 0
+          ? Number((callStats.aprSum / callStats.submissions).toFixed(2))
+          : null;
+
       return {
         id: c.id,
         name: c.full_name,
@@ -381,6 +468,12 @@ export async function getComprehensiveReportsAction(
         reviewedProjectedRevenue: proj.reviewedRev,
         metProjectedRevenue: proj.metRev,
         revenueWeightedPercentage: revWeightedPct,
+        totalCallsMade: callStats?.callsMade || 0,
+        totalTalkTimeMinutes: callStats?.talkTime || 0,
+        totalFollowUps: callStats?.followUps || 0,
+        averageAPR: counselorAvgAPR,
+        acceptableAPRDays: callStats?.acceptableDays || 0,
+        underperformingAPRDays: callStats?.underperformingDays || 0,
       };
     });
 
@@ -445,6 +538,13 @@ export async function getComprehensiveReportsAction(
         reviewedTotal > 0 ? Number(((projMet / reviewedTotal) * 100).toFixed(1)) : null,
       projectionRevenueWeightedPercentage:
         reviewedProjRev > 0 ? Number(((metProjRev / reviewedProjRev) * 100).toFixed(1)) : null,
+      totalCallsMade: totalTeamCallsMade,
+      totalCallsConnected: totalTeamCallsConnected,
+      totalTalkTimeMinutes: Number(totalTeamTalkTime.toFixed(2)),
+      totalFollowUps: totalTeamFollowUps,
+      averageAPR: averageTeamAPR,
+      acceptableAPRCount,
+      underperformingAPRCount,
     };
 
     const finalReportData: ComprehensiveReportData = {

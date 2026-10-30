@@ -30,6 +30,16 @@ export interface DailyCellData {
   notes?: string | null;
   hasConflict?: boolean; // When genuine admission exists on a day previously marked zero
   admissions: DailyAdmissionDetail[];
+  // Calling checkpoint performance on this date
+  callingPerformance?: {
+    calls_made: number;
+    calls_connected: number;
+    talk_time_minutes: number;
+    follow_ups: number;
+    admissions_converted: number;
+    apr_percent: number;
+    apr_reason?: string | null;
+  } | null;
 }
 
 export interface CounselorDailyRow {

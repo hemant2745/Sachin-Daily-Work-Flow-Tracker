@@ -191,6 +191,21 @@ export async function getDailyTrackerAction(
       });
     }
 
+    // 4b. Fetch calling performance checkpoints for this month
+    const { data: callingData } = await supabase
+      .from("counselor_calling_checkpoints")
+      .select("counselor_id, checkpoint_date, calls_made, calls_connected, talk_time_minutes, follow_ups, admissions_converted, apr_percent, apr_reason")
+      .gte("checkpoint_date", startDate)
+      .lte("checkpoint_date", endDate);
+
+    const callingMap = new Map<string, any>();
+    if (callingData) {
+      callingData.forEach((call: any) => {
+        const key = `${call.counselor_id}__${call.checkpoint_date}`;
+        callingMap.set(key, call);
+      });
+    }
+
     // Determine current date for streak calculation
     const todayISO = new Date().toISOString().split("T")[0];
 
@@ -269,6 +284,8 @@ export async function getDailyTrackerAction(
         counselorTotalCollections += colAmount;
         counselorTotalAdmissions += admCount;
 
+        const callCheckpoint = callingMap.get(key);
+
         const cellData: DailyCellData = {
           date: calDay.date,
           dayNumber: calDay.dayNumber,
@@ -289,6 +306,17 @@ export async function getDailyTrackerAction(
             amount_collected: Number(a.amount_collected) || 0,
             payment_mode: a.payment_mode,
           })),
+          callingPerformance: callCheckpoint
+            ? {
+                calls_made: Number(callCheckpoint.calls_made) || 0,
+                calls_connected: Number(callCheckpoint.calls_connected) || 0,
+                talk_time_minutes: Number(callCheckpoint.talk_time_minutes) || 0,
+                follow_ups: Number(callCheckpoint.follow_ups) || 0,
+                admissions_converted: Number(callCheckpoint.admissions_converted) || 0,
+                apr_percent: Number(callCheckpoint.apr_percent) || 0,
+                apr_reason: callCheckpoint.apr_reason || null,
+              }
+            : null,
         };
 
         days[calDay.date] = cellData;
