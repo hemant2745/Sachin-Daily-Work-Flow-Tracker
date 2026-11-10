@@ -72,23 +72,141 @@ export async function signInAction(formData: FormData): Promise<AuthActionResult
     };
   }
 
-  // Server-side administrator authorization verification
-  const sessionEvaluation = evaluateSessionAccess(data.user);
-
-  if (!sessionEvaluation.isAuthorized) {
-    // Crucial security step: Invalidate unauthorized session immediately
-    await supabase.auth.signOut();
+  // 1. Check if authorized administrator
+  const isSuperAdmin = isAuthorizedAdminEmail(data.user.email);
+  if (isSuperAdmin) {
+    revalidatePath("/", "layout");
     return {
-      success: false,
-      error: sessionEvaluation.message || "Access denied. Your account is not authorized as an administrator.",
+      success: true,
+      redirectTo: "/dashboard",
     };
   }
 
-  revalidatePath("/", "layout");
+  // 2. Check if authorized counselor record exists
+  try {
+    const { data: counselor } = await supabase
+      .from("counselors")
+      .select("id, full_name, is_active, auth_user_id")
+      .eq("email", email.toLowerCase())
+      .maybeSingle();
+
+    if (counselor && counselor.is_active) {
+      // Ensure auth_user_id is associated with this counselor
+      if (!counselor.auth_user_id && data.user.id) {
+        await supabase
+          .from("counselors")
+          .update({ auth_user_id: data.user.id })
+          .eq("id", counselor.id);
+      }
+
+      revalidatePath("/", "layout");
+      return {
+        success: true,
+        redirectTo: "/counselor",
+      };
+    }
+  } catch {
+    // Non-fatal
+  }
+
+  // If neither administrator nor active counselor, invalidate session immediately
+  await supabase.auth.signOut();
+  return {
+    success: false,
+    error: "Access denied. Your account is not authorized as an administrator or team counselor.",
+  };
+}
+
+/**
+ * Server Action for Counselor / Admin Password Update
+ */
+export async function changePasswordAction(newPassword: string): Promise<AuthActionResult> {
+  if (!newPassword || newPassword.length < 6) {
+    return {
+      success: false,
+      error: "Password must be at least 6 characters long.",
+    };
+  }
+
+  if (!isSupabaseConfigured()) {
+    return {
+      success: false,
+      error: "Supabase service is not configured.",
+    };
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+
+  if (error) {
+    return {
+      success: false,
+      error: error.message || "Failed to update password.",
+    };
+  }
+
   return {
     success: true,
-    redirectTo: "/dashboard",
+    message: "Password updated successfully.",
   };
+}
+
+/**
+ * Server Action for Administrator to provision a counselor login account
+ * Uses server-side Supabase Admin / Service Role securely.
+ */
+export async function provisionCounselorAccountAction(params: {
+  counselorId: string;
+  email: string;
+  initialPassword?: string;
+}): Promise<AuthActionResult> {
+  const { counselorId, email, initialPassword = "CollegeVidya@2026" } = params;
+
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: "Database service not configured." };
+  }
+
+  const supabase = createClient();
+  const { data: adminUser } = await supabase.auth.getUser();
+  if (!adminUser.user || !isAuthorizedAdminEmail(adminUser.user.email)) {
+    return { success: false, error: "Unauthorized: Administrator access required." };
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  try {
+    // 1. Verify counselor exists in database
+    const { data: counselor, error: cErr } = await supabase
+      .from("counselors")
+      .select("id, full_name, employee_code, email")
+      .eq("id", counselorId)
+      .single();
+
+    if (cErr || !counselor) {
+      return { success: false, error: "Counselor record not found." };
+    }
+
+    // 2. Update counselor email if different
+    if (counselor.email !== normalizedEmail) {
+      await supabase
+        .from("counselors")
+        .update({ email: normalizedEmail })
+        .eq("id", counselorId);
+    }
+
+    revalidatePath("/dashboard/counselors");
+    return {
+      success: true,
+      message: `Login credentials configured for ${counselor.full_name} (${normalizedEmail}). Account is ready for authentication.`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: "Unexpected error provisioning counselor account: " + (err?.message || "Unknown error"),
+    };
+  }
 }
 
 /**

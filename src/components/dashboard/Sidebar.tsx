@@ -17,7 +17,6 @@ import {
   Menu,
   X,
   LogOut,
-  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -59,14 +58,14 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile Top Bar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[#061B3D] border-b border-white/10 px-4 py-3 flex items-center justify-between shadow-md">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[#061B3D]/95 backdrop-blur-md border-b border-white/10 px-3.5 py-2.5 flex items-center justify-between shadow-md">
         <S3Logo size="sm" variant="dark" />
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="p-2 rounded-xl bg-white/10 border border-white/15 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-[#1677FF]"
+          className="p-1.5 rounded-lg bg-white/10 border border-white/15 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-[#1677FF]"
           aria-label="Toggle navigation menu"
         >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
         </button>
       </div>
 
@@ -78,103 +77,88 @@ export function Sidebar() {
         />
       )}
 
-      {/* Sidebar Container */}
+      {/* Compact Glassmorphism Sidebar Container */}
       <aside
         className={cn(
-          "fixed top-0 bottom-0 left-0 z-50 w-64 bg-[#061B3D] border-r border-[#DFEAFE]/10 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 shadow-2xl",
+          "fixed top-0 bottom-0 left-0 z-50 w-60 glass-sidebar flex flex-col justify-between transition-transform duration-300 ease-in-out lg:translate-x-0 shadow-2xl",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        {/* Top Branding Section */}
-        <div className="p-5 border-b border-white/10 flex items-center justify-between">
-          <S3Logo size="md" variant="dark" subtitle="Team Workflow Tracker" />
-          <button
-            onClick={() => setMobileOpen(false)}
-            className="lg:hidden text-gray-400 hover:text-white p-1"
-          >
-            <X className="w-5 h-5" />
-          </button>
+        {/* Top Header & Logo */}
+        <div>
+          <div className="p-3.5 sm:p-4 border-b border-white/10 flex items-center justify-between">
+            <S3Logo size="sm" variant="dark" subtitle="Team Workflow Tracker" />
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="lg:hidden text-gray-400 hover:text-white p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Compact Navigation List */}
+          <nav className="px-2.5 py-2.5 space-y-1 overflow-y-auto max-h-[calc(100vh-140px)]">
+            <div className="px-2.5 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-blue-200/50">
+              Workflow Modules
+            </div>
+            {navigationItems.map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                pathname === item.href ||
+                (item.href === "/dashboard" && pathname === "/") ||
+                (item.href !== "/dashboard" && !item.href.includes("#") && pathname.startsWith(item.href));
+
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 group",
+                    isActive
+                      ? "bg-gradient-to-r from-[#0866F5] to-[#1677FF] text-white shadow-[0_2px_12px_rgba(8,102,245,0.4)]"
+                      : "text-blue-100/75 hover:text-white hover:bg-white/10"
+                  )}
+                >
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <Icon
+                      className={cn(
+                        "w-4 h-4 shrink-0 transition-colors",
+                        isActive ? "text-white" : "text-blue-200/70 group-hover:text-white"
+                      )}
+                    />
+                    <span className="truncate">{item.label || item.name}</span>
+                  </div>
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0 shadow-xs" />
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
 
-        {/* Navigation Items */}
-        <nav className="flex-1 px-3.5 py-4 space-y-1.5 overflow-y-auto">
-          <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-blue-200/60">
-            Workflow Modules
-          </div>
-          {navigationItems.map((item) => {
-            const Icon = item.icon;
-            const isActive =
-              pathname === item.href ||
-              (item.href === "/dashboard" && pathname === "/") ||
-              (item.href !== "/dashboard" && !item.href.includes("#") && pathname.startsWith(item.href));
-
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "flex items-center justify-between px-4 py-3 rounded-xl text-xs sm:text-[13px] font-medium transition-all duration-150 group",
-                  isActive
-                    ? "bg-[#1677FF] text-white shadow-md font-bold"
-                    : "text-blue-100/80 hover:text-white hover:bg-white/10"
-                )}
-              >
-                <div className="flex items-center space-x-3.5 min-w-0">
-                  <Icon
-                    className={cn(
-                      "w-5 h-5 shrink-0 transition-colors",
-                      isActive ? "text-white" : "text-blue-200/75 group-hover:text-white"
-                    )}
-                  />
-                  <span className="truncate">{item.label || item.name}</span>
-                </div>
-                {isActive && (
-                  <span className="w-2 h-2 rounded-full bg-white shrink-0 shadow-xs" />
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Bottom Section */}
-        <div className="p-3 border-t border-white/10 space-y-2.5 bg-[#001A3D]/70">
-          {/* Production Suite Status Card */}
-          <div className="p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-xs">
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
-                <Sparkles className="w-3.5 h-3.5 text-[#FF8A00]" />
-                <span>Production Suite</span>
-              </div>
-              <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                Live & Secure
-              </span>
-            </div>
-            <p className="text-[10px] text-blue-200/60 leading-tight">
-              Single-Admin RLS Protected &bull; College Vidya
-            </p>
-          </div>
-
-          {/* Admin Profile Card */}
-          <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
-            <div className="flex items-center space-x-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#0866F5] to-[#18B9E8] flex items-center justify-center text-xs font-bold text-white shadow-sm shrink-0">
+        {/* Bottom Profile Section */}
+        <div className="p-2.5 border-t border-white/10 bg-[#001A3D]/70 space-y-2">
+          {/* User Profile Card */}
+          <div className="p-2 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between backdrop-blur-xs">
+            <div className="flex items-center space-x-2 min-w-0">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#0866F5] to-[#18B9E8] flex items-center justify-center text-[10px] font-bold text-white shadow-xs shrink-0">
                 SB
               </div>
               <div className="truncate">
-                <p className="text-xs font-semibold text-white truncate">Sachin Behera</p>
-                <p className="text-[10px] text-blue-200/70 truncate">Team Leader (Admin)</p>
+                <p className="text-[11px] font-bold text-white truncate leading-tight">Sachin Behera</p>
+                <p className="text-[9px] text-blue-200/60 truncate leading-none mt-0.5">Team Leader (Admin)</p>
               </div>
             </div>
             <button
               onClick={handleSignOut}
               disabled={isPending}
               title="Sign Out"
-              className="p-1.5 rounded-lg text-blue-200/70 hover:text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-50 shrink-0"
+              className="p-1 rounded-md text-blue-200/70 hover:text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-50 shrink-0"
               aria-label="Sign out"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

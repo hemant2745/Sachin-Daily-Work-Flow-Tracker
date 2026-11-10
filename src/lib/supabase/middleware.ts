@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseConfig } from "./config";
-import { evaluateRouteAccess } from "../auth/admin";
+import { evaluateRouteAccess, isAuthorizedAdminEmail } from "../auth/admin";
 
 /**
  * Updates session cookies and enforces server-side route authorization in Next.js Middleware.
@@ -57,7 +57,22 @@ export async function updateSession(request: NextRequest) {
     user = null;
   }
 
-  const evaluation = evaluateRouteAccess(pathname, user, true);
+  // Look up counselor status if user is logged in and not admin
+  let counselorInfo = null;
+  if (user && user.email && !isAuthorizedAdminEmail(user.email)) {
+    try {
+      const { data: c } = await supabase
+        .from("counselors")
+        .select("id, email, is_active")
+        .eq("email", user.email.toLowerCase())
+        .maybeSingle();
+      counselorInfo = c;
+    } catch {
+      counselorInfo = null;
+    }
+  }
+
+  const evaluation = evaluateRouteAccess(pathname, user, true, counselorInfo);
 
   if (evaluation.shouldRedirect && evaluation.redirectTo) {
     const url = request.nextUrl.clone();

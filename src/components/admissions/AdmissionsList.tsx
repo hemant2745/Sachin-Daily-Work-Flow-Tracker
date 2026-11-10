@@ -243,74 +243,74 @@ export function AdmissionsList({
       )}
 
       {/* 4 Summary Cards (Computed from Real Records) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
         {/* 1. Total Admissions (Lifetime) */}
-        <div className="bg-white border border-surface-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <div className="glass-card glass-card-hover rounded-xl p-3.5 shadow-xs">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
               Total Admissions
             </span>
-            <div className="w-8 h-8 rounded-lg bg-navy-50 text-navy-800 flex items-center justify-center">
-              <GraduationCap className="w-4 h-4 text-brand-orange" />
+            <div className="w-7 h-7 rounded-lg bg-[#0866F5]/10 text-navy-800 flex items-center justify-center">
+              <GraduationCap className="w-3.5 h-3.5 text-brand-orange" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-navy-800">{summary.totalAdmissions}</div>
-          <p className="text-[11px] text-gray-500 mt-1">Lifetime verified enrollments across team</p>
+          <div className="text-xl font-black text-navy-800">{summary.totalAdmissions}</div>
+          <p className="text-[10px] text-gray-500 mt-0.5">Lifetime verified enrollments across team</p>
         </div>
 
         {/* 2. Total Actual Collections (Lifetime) */}
-        <div className="bg-white border border-surface-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <div className="glass-card glass-card-hover rounded-xl p-3.5 shadow-xs">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
               Total Collections (Lifetime)
             </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <DollarSign className="w-4 h-4 text-emerald-600" />
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
+              <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-navy-800">
+          <div className="text-xl font-black text-navy-800">
             {formatINR(summary.totalCollections)}
           </div>
-          <p className="text-[11px] text-gray-500 mt-1">Cumulative verified money collected</p>
+          <p className="text-[10px] text-gray-500 mt-0.5">Cumulative verified money collected</p>
         </div>
 
         {/* 3. Current Month Collections */}
-        <div className="bg-white border border-surface-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <div className="glass-card glass-card-hover rounded-xl p-3.5 shadow-xs">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
               {selectedMonth === "ALL" ? "Current Month" : formatMonthDisplay(selectedMonth)} Collections
             </span>
-            <div className="w-8 h-8 rounded-lg bg-navy-50 text-navy-800 flex items-center justify-center">
-              <Coins className="w-4 h-4 text-brand-orange" />
+            <div className="w-7 h-7 rounded-lg bg-[#0866F5]/10 text-navy-800 flex items-center justify-center">
+              <Coins className="w-3.5 h-3.5 text-brand-orange" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-navy-800">
+          <div className="text-xl font-black text-navy-800">
             {formatINR(summary.currentMonthCollections)}
           </div>
-          <p className="text-[11px] text-gray-500 mt-1">
+          <p className="text-[10px] text-gray-500 mt-0.5">
             {summary.currentMonthAdmissionsCount} admission(s) credited to this period
           </p>
         </div>
 
         {/* 4. Average Collection per Admission */}
-        <div className="bg-white border border-surface-border rounded-xl p-4 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <div className="glass-card glass-card-hover rounded-xl p-3.5 shadow-xs">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
               Average per Admission
             </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
-              <DollarSign className="w-4 h-4 text-blue-600" />
+            <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-700 flex items-center justify-center">
+              <DollarSign className="w-3.5 h-3.5 text-blue-600" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-navy-800">
+          <div className="text-xl font-black text-navy-800">
             {formatINR(summary.averageCollection)}
           </div>
-          <p className="text-[11px] text-gray-500 mt-1">Lifetime average collected ticket size</p>
+          <p className="text-[10px] text-gray-500 mt-0.5">Lifetime average collected ticket size</p>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white border border-surface-border rounded-xl p-4 shadow-card space-y-3">
+      <div className="glass-card rounded-xl p-3 shadow-xs space-y-2.5">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* Search Input */}
           <div className="relative flex-1 max-w-md">
@@ -389,11 +389,11 @@ export function AdmissionsList({
       </div>
 
       {/* Admissions Table */}
-      <div className="bg-white border border-surface-border rounded-xl shadow-card overflow-hidden">
+      <div className="glass-card rounded-xl shadow-xs overflow-hidden">
         {sortedAdmissions.length === 0 ? (
-          <div className="py-12 px-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-navy-50 flex items-center justify-center text-navy-800 mx-auto mb-3">
-              <GraduationCap className="w-6 h-6 text-brand-orange" />
+          <div className="py-10 px-4 text-center">
+            <div className="w-10 h-10 rounded-full bg-navy-50 flex items-center justify-center text-navy-800 mx-auto mb-2.5">
+              <GraduationCap className="w-5 h-5 text-brand-orange" />
             </div>
             <h4 className="text-sm font-bold text-navy-800">
               {admissions.length === 0 ? "No Admissions Recorded" : "No Matching Admissions Found"}
@@ -409,9 +409,9 @@ export function AdmissionsList({
                   setEditingAdmission(null);
                   setIsModalOpen(true);
                 }}
-                className="mt-4 inline-flex items-center gap-1.5 bg-brand-orange hover:bg-brand-hover text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-all"
+                className="mt-3.5 inline-flex items-center gap-1.5 bg-brand-orange hover:bg-brand-hover text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition-all"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>Record First Admission</span>
               </button>
             )}
@@ -420,9 +420,9 @@ export function AdmissionsList({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-navy-950 text-white text-[11px] uppercase tracking-wider font-semibold border-b border-navy-800">
-                  <th className="py-3 px-4">Admission Date</th>
-                  <th className="py-3 px-4">Counselor</th>
+                <tr className="bg-[#061B3D]/95 backdrop-blur-md text-white text-[10px] uppercase tracking-wider font-bold border-b border-white/10">
+                  <th className="py-2.5 px-3">Admission Date</th>
+                  <th className="py-2.5 px-3">Counselor</th>
                   <th className="py-3 px-4">University & Program</th>
                   <th className="py-3 px-4 text-right">Amount Collected</th>
                   <th className="py-3 px-4 text-center">Payment Mode</th>

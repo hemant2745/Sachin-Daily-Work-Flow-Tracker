@@ -89,10 +89,10 @@ export function TargetModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white border border-surface-border rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-150">
+      <div className="glass-modal border border-white/80 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 bg-navy-900 border-b border-navy-800 flex items-center justify-between">
+        <div className="px-5 py-3.5 bg-[#061B3D]/95 backdrop-blur-md border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded-lg bg-navy-800 border border-brand-orange/40 flex items-center justify-center text-brand-orange">
               <Target className="w-4 h-4" />
@@ -107,7 +107,7 @@ export function TargetModal({
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-navy-800 transition-colors"
+            className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>

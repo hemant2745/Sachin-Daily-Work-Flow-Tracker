@@ -5,6 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { evaluateSessionAccess } from "@/lib/auth/admin";
 import { computeReportDateRange } from "@/lib/reports";
+import {
+  getDaysInMonth,
+  getMonthWeekPeriods,
+  buildCounselorWeeklyPerformance,
+} from "@/lib/weekly";
+import { normalizeMonthKey, formatINR } from "@/lib/format";
 import type {
   ReportFilterOptions,
   OverallPerformanceSummary,
@@ -13,6 +19,17 @@ import type {
   DailyTrendItem,
   ComprehensiveReportData,
 } from "@/types/reports";
+import type {
+  WeeklyAnalyticsFilterOptions,
+  WeeklyAnalyticsData,
+  WeekIdentifier,
+  ExpectedVsActualPoint,
+  WeeklyComparisonPoint,
+  PerformanceGapPoint,
+  CounselorComparisonPoint,
+  CounselorMonthlyPerformance,
+} from "@/types/analytics";
+import type { CounselorCategory } from "@/types/counselor";
 
 /**
  * Ensures caller is an authorized administrator before executing server action
@@ -570,3 +587,298 @@ export async function getComprehensiveReportsAction(
     };
   }
 }
+
+/**
+ * PHASE 3: Fetches weekly performance tracking and analytics data
+ */
+export async function getWeeklyAnalyticsAction(
+  options: WeeklyAnalyticsFilterOptions
+): Promise<{
+  success: boolean;
+  isConfigured: boolean;
+  data: WeeklyAnalyticsData | null;
+  error?: string;
+}> {
+  const auth = await verifyAdminAuth();
+  if (!auth.isAuthorized || !auth.supabase) {
+    return {
+      success: false,
+      isConfigured: auth.isConfigured,
+      data: null,
+      error: auth.error,
+    };
+  }
+
+  const supabase = auth.supabase;
+  const { year, month, counselorId, category, week } = options;
+  const totalDays = getDaysInMonth(year, month);
+  const monthStr = String(month).padStart(2, "0");
+  const monthKey = `${year}-${monthStr}-01`;
+  const startDate = `${year}-${monthStr}-01`;
+  const endDate = `${year}-${monthStr}-${String(totalDays).padStart(2, "0")}`;
+
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
+  const isPastMonth =
+    today.getFullYear() > year ||
+    (today.getFullYear() === year && today.getMonth() + 1 > month);
+  const elapsedMonthDays = isCurrentMonth ? Math.min(totalDays, today.getDate()) : isPastMonth ? totalDays : 0;
+  const monthProgress = totalDays > 0 ? (elapsedMonthDays / totalDays) * 100 : 0;
+
+  try {
+    // 1. Fetch active counselors
+    let counselorQuery = supabase
+      .from("counselors")
+      .select("*")
+      .eq("is_active", true)
+      .order("employee_code", { ascending: true });
+
+    if (counselorId && counselorId !== "ALL") {
+      counselorQuery = counselorQuery.eq("id", counselorId);
+    }
+    if (category && category !== "ALL") {
+      counselorQuery = counselorQuery.eq("category", category);
+    }
+
+    const { data: counselorsData, error: cErr } = await counselorQuery;
+    if (cErr) {
+      return { success: false, isConfigured: true, data: null, error: cErr.message };
+    }
+
+    const counselors = counselorsData || [];
+
+    // 2. Fetch category base targets for month
+    const defaultCatTargets: Record<CounselorCategory, number> = {
+      CDA: 800000,
+      SCDA: 600000,
+      PCA: 400000,
+    };
+    const categoryTargetsMap: Record<CounselorCategory, number> = { ...defaultCatTargets };
+
+    try {
+      const { data: catTargets } = await supabase
+        .from("category_monthly_targets")
+        .select("category, base_target")
+        .eq("target_month", monthKey);
+
+      if (catTargets) {
+        catTargets.forEach((ct: any) => {
+          if (ct.category && ct.base_target !== null) {
+            categoryTargetsMap[ct.category as CounselorCategory] = Number(ct.base_target);
+          }
+        });
+      }
+    } catch {
+      // Non-fatal if table not initialized
+    }
+
+    // 3. Fetch counselor monthly targets
+    const targetsMap = new Map<string, { base: number; additional: number; target: number }>();
+    try {
+      const { data: cTargets } = await supabase
+        .from("counselor_monthly_targets")
+        .select("counselor_id, base_target, additional_target, target_amount")
+        .eq("target_month", monthKey);
+
+      if (cTargets) {
+        cTargets.forEach((t: any) => {
+          targetsMap.set(t.counselor_id, {
+            base: Number(t.base_target) || 0,
+            additional: Number(t.additional_target) || 0,
+            target: Number(t.target_amount) || 0,
+          });
+        });
+      }
+    } catch {
+      // Non-fatal
+    }
+
+    // 4. Fetch verified admissions for month (only verified admissions count!)
+    const { data: admissionsData, error: admErr } = await supabase
+      .from("admissions")
+      .select("id, counselor_id, amount_collected, admission_date, verification_status")
+      .eq("verification_status", "verified")
+      .gte("admission_date", startDate)
+      .lte("admission_date", endDate);
+
+    if (admErr) {
+      return { success: false, isConfigured: true, data: null, error: admErr.message };
+    }
+
+    const admissions = admissionsData || [];
+
+    // Group admissions by counselor
+    const counselorAdmissionsMap = new Map<string, Array<{ amount: number; day: number; isVerified: boolean }>>();
+    admissions.forEach((a: any) => {
+      const list = counselorAdmissionsMap.get(a.counselor_id) || [];
+      const day = parseInt(a.admission_date.split("-")[2], 10);
+      list.push({
+        amount: Number(a.amount_collected) || 0,
+        day,
+        isVerified: true,
+      });
+      counselorAdmissionsMap.set(a.counselor_id, list);
+    });
+
+    // 5. Build weekly performance records for each counselor
+    const periods = getMonthWeekPeriods(year, month, today);
+
+    const counselorPerformances: CounselorMonthlyPerformance[] = counselors.map((c: any) => {
+      const cat = (c.category as CounselorCategory) || "CDA";
+      const targetRecord = targetsMap.get(c.id);
+
+      const baseTarget =
+        targetRecord && targetRecord.base > 0
+          ? targetRecord.base
+          : categoryTargetsMap[cat] || c.monthly_target || 800000;
+
+      const additionalTarget = targetRecord?.additional || 0;
+      const finalMonthlyTarget = targetRecord?.target && targetRecord.target > 0
+        ? targetRecord.target
+        : baseTarget + additionalTarget;
+
+      const counselorAdms = counselorAdmissionsMap.get(c.id) || [];
+
+      return buildCounselorWeeklyPerformance({
+        counselorId: c.id,
+        counselorName: c.full_name,
+        employeeCode: c.employee_code,
+        category: cat,
+        email: c.email || null,
+        baseTarget,
+        additionalTarget,
+        monthlyTarget: finalMonthlyTarget,
+        year,
+        month,
+        admissions: counselorAdms,
+        referenceDate: today,
+      });
+    });
+
+    // 6. Aggregate team summary
+    let totalMonthlyTarget = 0;
+    let totalExpectedRevenue = 0;
+    let totalActualRevenue = 0;
+    let totalActualAdmissions = 0;
+    let totalRemainingTarget = 0;
+
+    counselorPerformances.forEach((cp) => {
+      totalMonthlyTarget += cp.monthlyTarget;
+      totalExpectedRevenue += cp.expectedRevenue;
+      totalActualRevenue += cp.actualRevenue;
+      totalActualAdmissions += cp.actualAdmissions;
+      totalRemainingTarget += cp.remainingTarget;
+    });
+
+    const totalPerformanceGap = totalActualRevenue - totalExpectedRevenue;
+    const overallAchievementPercentage =
+      totalMonthlyTarget > 0 ? (totalActualRevenue / totalMonthlyTarget) * 100 : null;
+
+    // 7. Generate 4 Analytics Charts Data
+    // Chart 1: Expected vs Actual Revenue
+    const expectedVsActualPoints: ExpectedVsActualPoint[] = counselorPerformances.map((cp) => ({
+      counselorName: cp.counselorName,
+      employeeCode: cp.employeeCode,
+      category: cp.category,
+      expectedRevenue: cp.expectedRevenue,
+      actualRevenue: cp.actualRevenue,
+      gap: cp.performanceGap,
+      isAhead: cp.isAhead,
+    }));
+
+    // Chart 2: Weekly Performance Comparison (Weeks 1 to 4)
+    const weeklyComparisonPoints: WeeklyComparisonPoint[] = periods.map((p) => {
+      let weekExpected = 0;
+      let weekActual = 0;
+      let weekAdmissions = 0;
+
+      counselorPerformances.forEach((cp) => {
+        const wData = cp.weeks[p.week];
+        if (wData) {
+          weekExpected += wData.expectedRevenue;
+          weekActual += wData.actualRevenue;
+          weekAdmissions += wData.actualAdmissions;
+        }
+      });
+
+      const weekAch = weekExpected > 0 ? (weekActual / weekExpected) * 100 : null;
+
+      return {
+        week: p.week,
+        weekName: p.name,
+        periodLabel: `${p.startDay}th – ${p.endDay}th (${p.totalDays} days)`,
+        expectedRevenue: weekExpected,
+        actualRevenue: weekActual,
+        actualAdmissions: weekAdmissions,
+        achievementPercentage: weekAch,
+      };
+    });
+
+    // Chart 3: Performance Gap Chart
+    const performanceGapPoints: PerformanceGapPoint[] = counselorPerformances
+      .map((cp) => ({
+        counselorId: cp.counselorId,
+        counselorName: cp.counselorName,
+        employeeCode: cp.employeeCode,
+        category: cp.category,
+        gap: cp.performanceGap,
+        gapFormatted: `${cp.performanceGap >= 0 ? "+" : ""}${formatINR(cp.performanceGap)}`,
+        isAhead: cp.isAhead,
+        actualRevenue: cp.actualRevenue,
+        expectedRevenue: cp.expectedRevenue,
+      }))
+      .sort((a, b) => b.gap - a.gap);
+
+    // Chart 4: Counselor Comparison Chart (All 9 counselors)
+    const counselorComparisonPoints: CounselorComparisonPoint[] = counselorPerformances.map((cp) => ({
+      counselorId: cp.counselorId,
+      counselorName: cp.counselorName,
+      employeeCode: cp.employeeCode,
+      category: cp.category,
+      monthlyTarget: cp.monthlyTarget,
+      actualRevenue: cp.actualRevenue,
+      remainingTarget: cp.remainingTarget,
+      achievementPercentage: cp.achievementPercentage,
+      admissionCount: cp.actualAdmissions,
+    }));
+
+    const resultData: WeeklyAnalyticsData = {
+      filters: options,
+      periods,
+      monthDays: totalDays,
+      elapsedMonthDays,
+      monthProgressPercentage: monthProgress,
+      counselorPerformances,
+      teamSummary: {
+        totalMonthlyTarget,
+        totalExpectedRevenue,
+        totalActualRevenue,
+        totalActualAdmissions,
+        totalRemainingTarget,
+        totalPerformanceGap,
+        overallAchievementPercentage,
+        isTeamAhead: totalPerformanceGap >= 0,
+      },
+      charts: {
+        expectedVsActual: expectedVsActualPoints,
+        weeklyComparison: weeklyComparisonPoints,
+        performanceGap: performanceGapPoints,
+        counselorComparison: counselorComparisonPoints,
+      },
+    };
+
+    return {
+      success: true,
+      isConfigured: true,
+      data: resultData,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      isConfigured: true,
+      data: null,
+      error: "Unexpected error calculating weekly analytics: " + (err?.message || "Unknown error"),
+    };
+  }
+}
+

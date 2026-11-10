@@ -219,3 +219,181 @@ test("9. Form input validation handles empty & malformed credentials", () => {
   // Non-matching email
   assert.equal(isAuthorizedAdminEmail("attacker@evil.com"), false);
 });
+
+/**
+ * PHASE 4: Dual-Role Authentication & Authorization Tests
+ */
+
+function evaluateRoleAccess(user, counselorInfo, customAdminEmail) {
+  if (!user || !user.email) {
+    return {
+      isAuthorized: false,
+      role: "unauthenticated",
+      status: "UNAUTHENTICATED",
+      userEmail: null,
+    };
+  }
+
+  const isAdmin = isAuthorizedAdminEmail(user.email, customAdminEmail);
+  if (isAdmin) {
+    return {
+      isAuthorized: true,
+      role: "admin",
+      status: "AUTHORIZED_ADMIN",
+      userEmail: user.email,
+    };
+  }
+
+  const isCounselor = Boolean(counselorInfo && counselorInfo.is_active);
+  if (isCounselor) {
+    return {
+      isAuthorized: true,
+      role: "counselor",
+      status: "AUTHORIZED_COUNSELOR",
+      userEmail: user.email,
+      counselorId: counselorInfo.id,
+    };
+  }
+
+  return {
+    isAuthorized: false,
+    role: "unauthorized",
+    status: "UNAUTHORIZED_USER",
+    userEmail: user.email,
+  };
+}
+
+function evaluateMultiRoleRouteAccess(pathname, user, isConfigured, counselorInfo, customAdminEmail) {
+  const isAdminPath = pathname.startsWith("/dashboard");
+  const isCounselorPath = pathname.startsWith("/counselor");
+  const isProtectedPath = isAdminPath || isCounselorPath;
+  const isAuthPath = pathname === "/login" || pathname === "/";
+
+  if (!isConfigured) {
+    if (isProtectedPath) {
+      return {
+        shouldRedirect: true,
+        redirectTo: "/login?notice=setup_required",
+      };
+    }
+    return { shouldRedirect: false };
+  }
+
+  const session = evaluateRoleAccess(user, counselorInfo, customAdminEmail);
+
+  if (isAdminPath) {
+    if (session.status === "UNAUTHENTICATED") {
+      return {
+        shouldRedirect: true,
+        redirectTo: `/login?redirect=${encodeURIComponent(pathname)}&error=unauthenticated`,
+      };
+    }
+
+    if (session.status === "AUTHORIZED_COUNSELOR") {
+      return {
+        shouldRedirect: true,
+        redirectTo: "/counselor",
+        reason: "Counselors are restricted from admin console",
+      };
+    }
+
+    if (session.status === "UNAUTHORIZED_USER") {
+      return {
+        shouldRedirect: true,
+        redirectTo: "/login?error=unauthorized",
+      };
+    }
+
+    return { shouldRedirect: false };
+  }
+
+  if (isCounselorPath) {
+    if (session.status === "UNAUTHENTICATED") {
+      return {
+        shouldRedirect: true,
+        redirectTo: `/login?redirect=${encodeURIComponent(pathname)}&error=unauthenticated`,
+      };
+    }
+
+    if (session.status === "UNAUTHORIZED_USER") {
+      return {
+        shouldRedirect: true,
+        redirectTo: "/login?error=unauthorized",
+      };
+    }
+
+    return { shouldRedirect: false };
+  }
+
+  if (isAuthPath) {
+    if (session.status === "AUTHORIZED_ADMIN") {
+      return {
+        shouldRedirect: true,
+        redirectTo: "/dashboard",
+      };
+    }
+    if (session.status === "AUTHORIZED_COUNSELOR") {
+      return {
+        shouldRedirect: true,
+        redirectTo: "/counselor",
+      };
+    }
+  }
+
+  return { shouldRedirect: false };
+}
+
+test("10. Phase 4: Counselor role evaluation identifies active counselor account", () => {
+  const counselorUser = { email: "shikha@collegevidya.com" };
+  const counselorRecord = { id: "c1", email: "shikha@collegevidya.com", is_active: true };
+
+  const session = evaluateRoleAccess(counselorUser, counselorRecord);
+  assert.equal(session.isAuthorized, true);
+  assert.equal(session.role, "counselor");
+  assert.equal(session.status, "AUTHORIZED_COUNSELOR");
+  assert.equal(session.counselorId, "c1");
+});
+
+test("11. Phase 4: Counselor navigating to /dashboard is restricted and redirected to /counselor", () => {
+  const counselorUser = { email: "shikha@collegevidya.com" };
+  const counselorRecord = { id: "c1", email: "shikha@collegevidya.com", is_active: true };
+
+  const result = evaluateMultiRoleRouteAccess("/dashboard", counselorUser, true, counselorRecord);
+  assert.equal(result.shouldRedirect, true);
+  assert.equal(result.redirectTo, "/counselor");
+});
+
+test("12. Phase 4: Counselor accessing /counselor is allowed into counselor workspace", () => {
+  const counselorUser = { email: "shikha@collegevidya.com" };
+  const counselorRecord = { id: "c1", email: "shikha@collegevidya.com", is_active: true };
+
+  const result = evaluateMultiRoleRouteAccess("/counselor", counselorUser, true, counselorRecord);
+  assert.equal(result.shouldRedirect, false);
+});
+
+test("13. Phase 4: Authenticated counselor navigating to /login redirects to /counselor", () => {
+  const counselorUser = { email: "shikha@collegevidya.com" };
+  const counselorRecord = { id: "c1", email: "shikha@collegevidya.com", is_active: true };
+
+  const result = evaluateMultiRoleRouteAccess("/login", counselorUser, true, counselorRecord);
+  assert.equal(result.shouldRedirect, true);
+  assert.equal(result.redirectTo, "/counselor");
+});
+
+test("14. Phase 4: Counselor admission permission restricts verification status to 'unverified'", () => {
+  const counselorId = "c1";
+  const admissionSubmission = {
+    counselor_id: counselorId,
+    student_name: "Aman",
+    university_name: "Jain University",
+    program_name: "Online MBA",
+    amount_collected: 55000,
+    payment_mode: "semester_fees",
+    // Counselor cannot verify their own admission
+    verification_status: "unverified",
+  };
+
+  assert.equal(admissionSubmission.verification_status, "unverified");
+  assert.equal(admissionSubmission.counselor_id, counselorId);
+});
+

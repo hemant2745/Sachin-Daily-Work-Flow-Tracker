@@ -49,46 +49,73 @@ export function isAuthorizedAdminEmail(email?: string | null): boolean {
   return allowlist.includes(normalized);
 }
 
+export type UserRole = "admin" | "counselor" | "unauthorized" | "unauthenticated";
+
 export type SessionAccessStatus = 
   | "UNAUTHENTICATED"
   | "AUTHORIZED_ADMIN"
+  | "AUTHORIZED_COUNSELOR"
   | "UNAUTHORIZED_USER";
 
 export interface SessionAccessResult {
   isAuthorized: boolean;
+  role: UserRole;
   status: SessionAccessStatus;
   userEmail: string | null;
+  counselorId?: string | null;
   message?: string;
 }
 
 /**
  * Evaluates access status for a given user record.
+ * Supports both Admin and Counselor roles.
  */
-export function evaluateSessionAccess(user: { email?: string | null } | null): SessionAccessResult {
+export function evaluateSessionAccess(
+  user: { email?: string | null; id?: string; app_metadata?: any; user_metadata?: any } | null,
+  counselorInfo?: { id: string; email?: string | null; is_active: boolean } | null
+): SessionAccessResult {
   if (!user || !user.email) {
     return {
       isAuthorized: false,
+      role: "unauthenticated",
       status: "UNAUTHENTICATED",
       userEmail: null,
       message: "No active session found. Please sign in.",
     };
   }
 
-  const isAuthorized = isAuthorizedAdminEmail(user.email);
-
-  if (isAuthorized) {
+  const isAdmin = isAuthorizedAdminEmail(user.email);
+  if (isAdmin) {
     return {
       isAuthorized: true,
+      role: "admin",
       status: "AUTHORIZED_ADMIN",
       userEmail: user.email,
     };
   }
 
+  // Check if user is an authorized counselor
+  const isCounselor =
+    Boolean(counselorInfo && counselorInfo.is_active) ||
+    user.app_metadata?.role === "counselor" ||
+    user.user_metadata?.role === "counselor";
+
+  if (isCounselor) {
+    return {
+      isAuthorized: true,
+      role: "counselor",
+      status: "AUTHORIZED_COUNSELOR",
+      userEmail: user.email,
+      counselorId: counselorInfo?.id || null,
+    };
+  }
+
   return {
     isAuthorized: false,
+    role: "unauthorized",
     status: "UNAUTHORIZED_USER",
     userEmail: user.email,
-    message: `Access denied. The account (${user.email}) is not authorized as an administrator for Sachin Behera Daily Workflow.`,
+    message: `Access denied. The account (${user.email}) is not authorized for Sachin Daily Work Flow Tracker.`,
   };
 }
 
@@ -104,10 +131,13 @@ export interface RouteAccessEvaluation {
  */
 export function evaluateRouteAccess(
   pathname: string,
-  user: { email?: string | null } | null,
-  isConfigured: boolean
+  user: { email?: string | null; id?: string; app_metadata?: any; user_metadata?: any } | null,
+  isConfigured: boolean,
+  counselorInfo?: { id: string; email?: string | null; is_active: boolean } | null
 ): RouteAccessEvaluation {
-  const isProtectedPath = pathname.startsWith("/dashboard");
+  const isAdminPath = pathname.startsWith("/dashboard");
+  const isCounselorPath = pathname.startsWith("/counselor");
+  const isProtectedPath = isAdminPath || isCounselorPath;
   const isAuthPath = pathname === "/login" || pathname === "/";
 
   // If Supabase is not configured yet:
@@ -122,15 +152,24 @@ export function evaluateRouteAccess(
     return { shouldRedirect: false };
   }
 
-  const session = evaluateSessionAccess(user);
+  const session = evaluateSessionAccess(user, counselorInfo);
 
-  // Protected route handling
-  if (isProtectedPath) {
+  // 1. Admin protected routes (/dashboard/*)
+  if (isAdminPath) {
     if (session.status === "UNAUTHENTICATED") {
       return {
         shouldRedirect: true,
         redirectTo: `/login?redirect=${encodeURIComponent(pathname)}&error=unauthenticated`,
         reason: "User is not authenticated",
+      };
+    }
+
+    if (session.status === "AUTHORIZED_COUNSELOR") {
+      // Counselors are strictly restricted from /dashboard admin console
+      return {
+        shouldRedirect: true,
+        redirectTo: "/counselor",
+        reason: "Counselors are redirected to their individual counselor dashboard",
       };
     }
 
@@ -145,13 +184,43 @@ export function evaluateRouteAccess(
     return { shouldRedirect: false };
   }
 
-  // Auth route handling (prevent authenticated admin from seeing login)
+  // 2. Counselor protected routes (/counselor/*)
+  if (isCounselorPath) {
+    if (session.status === "UNAUTHENTICATED") {
+      return {
+        shouldRedirect: true,
+        redirectTo: `/login?redirect=${encodeURIComponent(pathname)}&error=unauthenticated`,
+        reason: "User is not authenticated",
+      };
+    }
+
+    if (session.status === "UNAUTHORIZED_USER") {
+      return {
+        shouldRedirect: true,
+        redirectTo: "/login?error=unauthorized",
+        reason: "User is not authorized as a team counselor",
+      };
+    }
+
+    // Both Counselors and Admins can view counselor route (Admin has supervisor view)
+    return { shouldRedirect: false };
+  }
+
+  // 3. Auth routes (/login or /)
   if (isAuthPath) {
     if (session.status === "AUTHORIZED_ADMIN") {
       return {
         shouldRedirect: true,
         redirectTo: "/dashboard",
         reason: "Authorized administrator already has an active session",
+      };
+    }
+
+    if (session.status === "AUTHORIZED_COUNSELOR") {
+      return {
+        shouldRedirect: true,
+        redirectTo: "/counselor",
+        reason: "Authorized counselor already has an active session",
       };
     }
   }

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { X, UserPlus, Save, AlertCircle } from "lucide-react";
 import { validateCounselorInput } from "@/lib/format";
-import type { Counselor, CounselorFormData } from "@/types/counselor";
+import type { Counselor, CounselorFormData, CounselorCategory } from "@/types/counselor";
 
 interface CounselorModalProps {
   isOpen: boolean;
@@ -17,6 +17,7 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
 
   const [employeeCode, setEmployeeCode] = useState("");
   const [fullName, setFullName] = useState("");
+  const [category, setCategory] = useState<CounselorCategory>("CDA");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [monthlyTarget, setMonthlyTarget] = useState<number | string>(0);
@@ -31,6 +32,7 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
     if (counselor) {
       setEmployeeCode(counselor.employee_code);
       setFullName(counselor.full_name);
+      setCategory((counselor.category as CounselorCategory) || "CDA");
       setEmail(counselor.email || "");
       setPhone(counselor.phone || "");
       setMonthlyTarget(counselor.monthly_target);
@@ -39,10 +41,11 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
     } else {
       setEmployeeCode("");
       setFullName("");
+      setCategory("CDA");
       setEmail("");
       setPhone("");
-      setMonthlyTarget(0);
-      setMonthlyAdmissionTarget(0);
+      setMonthlyTarget(800000);
+      setMonthlyAdmissionTarget(8);
       setIsActive(true);
     }
     setErrors({});
@@ -51,6 +54,23 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
 
   if (!isOpen) return null;
 
+  const handleCategoryChange = (newCat: CounselorCategory) => {
+    setCategory(newCat);
+    // If adding a new counselor or targets are default, align with category standard
+    if (!isEditMode) {
+      if (newCat === "CDA") {
+        setMonthlyTarget(800000);
+        setMonthlyAdmissionTarget(8);
+      } else if (newCat === "SCDA") {
+        setMonthlyTarget(600000);
+        setMonthlyAdmissionTarget(6);
+      } else if (newCat === "PCA") {
+        setMonthlyTarget(400000);
+        setMonthlyAdmissionTarget(4);
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError(null);
@@ -58,6 +78,7 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
     const formData: CounselorFormData = {
       employee_code: employeeCode.trim().toUpperCase(),
       full_name: fullName.trim(),
+      category,
       email: email.trim().toLowerCase() || undefined,
       phone: phone.trim() || undefined,
       monthly_target: Math.max(0, Number(monthlyTarget) || 0),
@@ -90,10 +111,10 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white border border-surface-border rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-150">
+      <div className="glass-modal rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-white/80">
         {/* Header */}
-        <div className="px-6 py-4 bg-navy-900 border-b border-navy-800 flex items-center justify-between">
+        <div className="px-5 py-3.5 bg-[#061B3D]/95 backdrop-blur-md border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded-lg bg-navy-800 border border-brand-orange/40 flex items-center justify-center text-brand-orange">
               {isEditMode ? <Save className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
@@ -105,14 +126,14 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
               <p className="text-[11px] text-gray-400">
                 {isEditMode
                   ? "Update counselor information and default quota"
-                  : "Register a team counselor record (records only; no login account)"}
+                  : "Register a team counselor record"}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-navy-800 transition-colors"
+            className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -163,6 +184,36 @@ export function CounselorModal({ isOpen, onClose, onSubmit, counselor }: Counsel
                 <p className="text-[11px] text-red-600 mt-1">{errors.full_name}</p>
               )}
             </div>
+          </div>
+
+          {/* Counselor Category Selection */}
+          <div>
+            <label className="block text-xs font-semibold text-navy-800 mb-1.5 uppercase tracking-wider">
+              Counselor Category *
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["CDA", "SCDA", "PCA"] as CounselorCategory[]).map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => handleCategoryChange(cat)}
+                  disabled={isSubmitting}
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
+                    category === cat
+                      ? "bg-brand-orange text-white border-brand-orange shadow-xs ring-2 ring-brand-orange/30"
+                      : "bg-surface-light text-navy-800 border-gray-200 hover:bg-gray-100"
+                  }`}
+                >
+                  <div className="text-xs">{cat}</div>
+                  <div className={`text-[10px] font-normal ${category === cat ? "text-white/90" : "text-gray-400"}`}>
+                    {cat === "CDA" ? "Base: ₹8L" : cat === "SCDA" ? "Base: ₹6L" : "Base: ₹4L"}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-500 mt-1">
+              Category defines the base monthly quota for this counselor. Additional individual target can be layered on top.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

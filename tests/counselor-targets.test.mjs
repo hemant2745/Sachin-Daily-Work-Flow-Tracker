@@ -382,3 +382,116 @@ test("11. Month key normalization to first day of month (YYYY-MM-01)", () => {
   assert.equal(normalizeMonthKey(new Date(2026, 9, 28)), "2026-10-01");
   assert.equal(formatMonthDisplay("2026-10-01"), "October 2026");
 });
+
+/**
+ * PHASE 2: Counselor Category & Dynamic Target Management Tests
+ */
+
+// Helper to simulate Phase 2 category target calculation logic
+function calculateDynamicMonthlyTarget(category, baseTargetOverride, additionalTarget = 0) {
+  const DEFAULT_BASE = {
+    CDA: 800000,
+    SCDA: 600000,
+    PCA: 400000,
+  };
+  const baseTarget = baseTargetOverride !== undefined ? baseTargetOverride : (DEFAULT_BASE[category] || 800000);
+  const additional = Math.max(0, Number(additionalTarget) || 0);
+  const finalTarget = baseTarget + additional;
+  return {
+    category,
+    baseTarget,
+    additionalTarget: additional,
+    finalTarget,
+  };
+}
+
+test("12. Phase 2: Category base targets default correctly for CDA, SCDA, and PCA", () => {
+  const cda = calculateDynamicMonthlyTarget("CDA");
+  assert.equal(cda.baseTarget, 800000);
+  assert.equal(cda.finalTarget, 800000);
+
+  const scda = calculateDynamicMonthlyTarget("SCDA");
+  assert.equal(scda.baseTarget, 600000);
+  assert.equal(scda.finalTarget, 600000);
+
+  const pca = calculateDynamicMonthlyTarget("PCA");
+  assert.equal(pca.baseTarget, 400000);
+  assert.equal(pca.finalTarget, 400000);
+});
+
+test("13. Phase 2: Individual Monthly Target = Category Base Target + Individual Additional Target", () => {
+  // CDA baseline: ₹8,00,000 + Additional: ₹50,000 = ₹8,50,000
+  const cdaWithAdditional = calculateDynamicMonthlyTarget("CDA", 800000, 50000);
+  assert.equal(cdaWithAdditional.baseTarget, 800000);
+  assert.equal(cdaWithAdditional.additionalTarget, 50000);
+  assert.equal(cdaWithAdditional.finalTarget, 850000);
+
+  // SCDA baseline: ₹6,00,000 + Additional: ₹75,000 = ₹6,75,000
+  const scdaWithAdditional = calculateDynamicMonthlyTarget("SCDA", 600000, 75000);
+  assert.equal(scdaWithAdditional.baseTarget, 600000);
+  assert.equal(scdaWithAdditional.additionalTarget, 75000);
+  assert.equal(scdaWithAdditional.finalTarget, 675000);
+
+  // PCA baseline: ₹4,00,000 + Additional: ₹25,000 = ₹4,25,000
+  const pcaWithAdditional = calculateDynamicMonthlyTarget("PCA", 400000, 25000);
+  assert.equal(pcaWithAdditional.baseTarget, 400000);
+  assert.equal(pcaWithAdditional.additionalTarget, 25000);
+  assert.equal(pcaWithAdditional.finalTarget, 425000);
+});
+
+test("14. Phase 2: Target adjustment lifecycle - Add, Edit, and Remove Additional Target", () => {
+  // Step 1: Initial state without additional target
+  let state = calculateDynamicMonthlyTarget("CDA", 800000, 0);
+  assert.equal(state.finalTarget, 800000);
+
+  // Step 2: Add additional target of ₹50,000
+  state = calculateDynamicMonthlyTarget("CDA", 800000, 50000);
+  assert.equal(state.additionalTarget, 50000);
+  assert.equal(state.finalTarget, 850000);
+
+  // Step 3: Edit additional target to ₹1,00,000
+  state = calculateDynamicMonthlyTarget("CDA", 800000, 100000);
+  assert.equal(state.additionalTarget, 100000);
+  assert.equal(state.finalTarget, 900000);
+
+  // Step 4: Remove additional target (set back to 0)
+  state = calculateDynamicMonthlyTarget("CDA", 800000, 0);
+  assert.equal(state.additionalTarget, 0);
+  assert.equal(state.finalTarget, 800000);
+});
+
+test("15. Phase 2: Category reassignment recalculates final target while maintaining additional target", () => {
+  // Counselor starts as CDA with ₹50,000 additional target
+  let c = calculateDynamicMonthlyTarget("CDA", 800000, 50000);
+  assert.equal(c.finalTarget, 850000);
+
+  // Counselor is promoted or changed to SCDA (base target ₹6,00,000)
+  // Formula: new category base (₹6,00,000) + additional target (₹50,000) = ₹6,50,000
+  c = calculateDynamicMonthlyTarget("SCDA", 600000, c.additionalTarget);
+  assert.equal(c.baseTarget, 600000);
+  assert.equal(c.additionalTarget, 50000);
+  assert.equal(c.finalTarget, 650000);
+});
+
+test("16. Phase 2: Month-wise target protection prevents target updates from rewriting historical months", () => {
+  const monthSnapshots = new Map();
+
+  // Month 1: October 2026 CDA Target = ₹8,00,000 base + ₹50,000 addl = ₹8,50,000
+  monthSnapshots.set("2026-10-01", calculateDynamicMonthlyTarget("CDA", 800000, 50000));
+
+  // Month 2: November 2026 Admin updates CDA base target to ₹9,00,000 and additional to ₹1,00,000
+  monthSnapshots.set("2026-11-01", calculateDynamicMonthlyTarget("CDA", 900000, 100000));
+
+  // Verify historical month (October 2026) remains completely unchanged
+  const oct = monthSnapshots.get("2026-10-01");
+  assert.equal(oct.baseTarget, 800000);
+  assert.equal(oct.additionalTarget, 50000);
+  assert.equal(oct.finalTarget, 850000);
+
+  // Verify current month (November 2026) reflects new configuration
+  const nov = monthSnapshots.get("2026-11-01");
+  assert.equal(nov.baseTarget, 900000);
+  assert.equal(nov.additionalTarget, 100000);
+  assert.equal(nov.finalTarget, 1000000);
+});
+

@@ -151,25 +151,25 @@ export function TeamPerformanceChart({
   const activePoint = hoveredIndex !== null ? pointsCoordinates[hoveredIndex] : null;
 
   return (
-    <div className="bg-white border border-[#DFEAFE] rounded-3xl p-6 sm:p-7 shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[380px]">
+    <div className="glass-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between min-h-[320px]">
       <div>
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-3 border-b border-[#DFEAFE]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 mb-2.5 border-b border-[#DFEAFE]/70">
           <div>
-            <h4 className="text-base font-extrabold text-[#0A2454]">Team Performance Trend</h4>
-            <p className="text-xs text-[#61789E] mt-0.5">
+            <h4 className="text-sm font-black text-[#0A2454]">Team Performance Trend</h4>
+            <p className="text-[11px] text-[#61789E] mt-0.5">
               Month-to-date collections pace versus prorated team quota.
             </p>
           </div>
 
           {/* Legend */}
-          <div className="flex items-center gap-4 text-xs font-bold">
+          <div className="flex items-center gap-3 text-[11px] font-bold">
             <span className="flex items-center gap-1.5 text-[#0866F5]">
-              <span className="w-3 h-3 rounded-full bg-[#0866F5] shadow-xs" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#0866F5] shadow-2xs" />
               Revenue Achieved
             </span>
             <span className="flex items-center gap-1.5 text-[#FF8A00]">
-              <span className="w-3 h-1.5 rounded-full bg-[#FF8A00] shadow-xs" />
+              <span className="w-2.5 h-1 rounded-full bg-[#FF8A00] shadow-2xs" />
               Monthly Target
             </span>
           </div>
@@ -317,9 +317,9 @@ export function TeamPerformanceChart({
       </div>
 
       {/* Footer Info */}
-      <div className="mt-4 pt-3 border-t border-[#DFEAFE] flex items-center justify-between text-xs text-[#61789E]">
+      <div className="mt-3 pt-2.5 border-t border-[#DFEAFE]/70 flex items-center justify-between text-[11px] text-[#61789E]">
         <span className="font-medium">Active Enrolled Admissions: <strong className="text-[#0A2454]">{admissions.length}</strong></span>
-        <span className="font-bold text-[#0866F5] bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
+        <span className="font-bold text-[#0866F5] bg-blue-50/80 px-2 py-0.5 rounded-full border border-blue-200">
           Monthly Quota: {formatINR(monthlyTarget)}
         </span>
       </div>

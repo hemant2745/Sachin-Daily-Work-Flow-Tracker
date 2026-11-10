@@ -15,6 +15,7 @@ import { CounselorPerformanceTable } from "./CounselorPerformanceTable";
 import { UniversityBreakdownTable } from "./UniversityBreakdownTable";
 import { PerformanceTrendsChart } from "./PerformanceTrendsChart";
 import { ExportReportModal } from "./ExportReportModal";
+import { WeeklyAnalyticsSection } from "@/components/analytics/WeeklyAnalyticsSection";
 import type {
   ComprehensiveReportData,
   ReportDateRangeType,
@@ -41,9 +42,9 @@ export function ReportsDashboard({ initialData }: ReportsDashboardProps) {
     initialData.filters.universityName || "ALL"
   );
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"counselors" | "universities" | "trends">(
-    "counselors"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "weekly" | "counselors" | "universities" | "trends"
+  >("weekly");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleApplyFilter = (e?: React.FormEvent) => {
@@ -269,6 +270,16 @@ export function ReportsDashboard({ initialData }: ReportsDashboardProps) {
         <div className="flex items-center justify-between border-b border-navy-800 pb-2">
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setActiveTab("weekly")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === "weekly"
+                  ? "bg-navy-800 text-brand-orange border border-brand-orange/40 shadow-sm"
+                  : "text-gray-400 hover:text-white hover:bg-navy-900"
+              }`}
+            >
+              Weekly Analytics (4 Charts)
+            </button>
+            <button
               onClick={() => setActiveTab("counselors")}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === "counselors"
@@ -306,6 +317,7 @@ export function ReportsDashboard({ initialData }: ReportsDashboardProps) {
         </div>
 
         {/* Tab Displays */}
+        {activeTab === "weekly" && <WeeklyAnalyticsSection />}
         {activeTab === "counselors" && (
           <CounselorPerformanceTable counselors={data.counselors} />
         )}

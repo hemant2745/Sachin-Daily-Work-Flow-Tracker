@@ -134,10 +134,10 @@ export function AdmissionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white border border-surface-border rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-150">
+      <div className="glass-modal border border-white/80 rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="bg-navy-950 px-6 py-4 flex items-center justify-between border-b border-navy-800 text-white">
+        <div className="bg-[#061B3D]/95 px-5 py-3.5 flex items-center justify-between border-b border-white/10 text-white backdrop-blur-md">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded-lg bg-navy-900 border border-brand-orange/40 flex items-center justify-center text-brand-orange">
               <GraduationCap className="w-4 h-4" />

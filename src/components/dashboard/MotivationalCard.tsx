@@ -3,26 +3,26 @@ import { Sparkles, Quote } from "lucide-react";
 
 export function MotivationalCard() {
   return (
-    <div className="relative overflow-hidden bg-gradient-to-br from-[#DFEAFE]/90 via-[#F3F8FF] to-white border border-[#DFEAFE] rounded-3xl p-7 sm:p-8 shadow-xs hover:shadow-md transition-all flex flex-col justify-between min-h-[380px]">
+    <div className="relative overflow-hidden glass-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between min-h-[320px]">
       {/* Decorative background glow */}
-      <div className="absolute -top-16 -right-16 w-56 h-56 bg-[#0866F5]/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-[#FF8A00]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -top-12 -right-12 w-44 h-44 bg-[#0866F5]/10 rounded-full blur-2xl pointer-events-none" />
+      <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-[#FF8A00]/10 rounded-full blur-2xl pointer-events-none" />
 
       {/* Top Section with Quote Icon & Subtitle */}
       <div>
-        <div className="flex items-center justify-between mb-5">
-          <div className="w-12 h-12 rounded-2xl bg-[#0866F5]/10 flex items-center justify-center text-[#0866F5] shadow-xs">
-            <Quote className="w-6 h-6 rotate-180" />
+        <div className="flex items-center justify-between mb-3">
+          <div className="w-8 h-8 rounded-lg bg-[#0866F5]/10 border border-[#0866F5]/20 flex items-center justify-center text-[#0866F5] shadow-2xs">
+            <Quote className="w-4 h-4 rotate-180" />
           </div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 border border-[#DFEAFE] text-xs font-bold text-[#0866F5] shadow-xs">
-            <Sparkles className="w-3.5 h-3.5 text-[#FF8A00]" />
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/80 border border-[#DFEAFE] text-[10px] font-bold text-[#0866F5] shadow-2xs backdrop-blur-xs">
+            <Sparkles className="w-3 h-3 text-[#FF8A00]" />
             <span>Daily Leadership Mantra</span>
           </span>
         </div>
 
         {/* Motivational Text */}
-        <div className="my-3">
-          <h3 className="text-2xl sm:text-3xl font-black text-[#0A2454] tracking-tight leading-snug">
+        <div className="my-2">
+          <h3 className="text-xl sm:text-2xl font-black text-[#0A2454] tracking-tight leading-snug">
             &ldquo;Small steps <br />
             every day lead to <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0866F5] via-[#1677FF] to-[#18B9E8]">
@@ -32,32 +32,32 @@ export function MotivationalCard() {
         </div>
 
         {/* Signature */}
-        <div className="mt-5 flex items-center gap-2.5">
-          <div className="w-8 h-1 bg-[#FF8A00] rounded-full" />
-          <p className="text-base font-black text-[#0A2454] tracking-tight">
+        <div className="mt-3 flex items-center gap-2">
+          <div className="w-6 h-0.5 bg-[#FF8A00] rounded-full" />
+          <p className="text-sm font-black text-[#0A2454] tracking-tight">
             — Sachin Behera
           </p>
         </div>
-        <p className="text-xs font-semibold text-[#61789E] ml-10 mt-0.5">
+        <p className="text-[10px] font-semibold text-[#61789E] ml-8 mt-0.5">
           Team Leader &bull; College Vidya
         </p>
       </div>
 
       {/* Blue & Orange Target Illustration */}
-      <div className="mt-8 pt-5 border-t border-[#DFEAFE] flex items-center justify-between gap-4">
-        <div className="text-xs text-[#61789E]">
-          <p className="font-bold text-[#0A2454] text-sm">Consistency & Precision</p>
-          <p className="text-xs mt-0.5">Execute daily targets with focus.</p>
+      <div className="mt-4 pt-3 border-t border-[#DFEAFE]/70 flex items-center justify-between gap-3">
+        <div className="text-[11px] text-[#61789E]">
+          <p className="font-bold text-[#0A2454] text-xs">Consistency & Precision</p>
+          <p className="text-[10px] mt-0.5">Execute daily targets with focus.</p>
         </div>
 
         {/* Enhanced SVG Bullseye Target with Arrow */}
         <svg
-          width="64"
-          height="64"
+          width="48"
+          height="48"
           viewBox="0 0 100 100"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="shrink-0 drop-shadow-md select-none"
+          className="shrink-0 drop-shadow-sm select-none"
           aria-label="Target Illustration"
         >
           {/* Outer circle */}

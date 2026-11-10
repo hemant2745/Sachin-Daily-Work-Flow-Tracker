@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import {
   Eye,
   EyeOff,
@@ -10,9 +9,7 @@ import {
   Mail,
   AlertCircle,
   Info,
-  ArrowRight,
   ShieldCheck,
-  CheckCircle2,
   KeyRound,
 } from "lucide-react";
 import { signInAction } from "@/app/auth/actions";
@@ -35,17 +32,17 @@ export function LoginForm() {
     const messageParam = searchParams.get("message");
 
     if (errorParam === "unauthenticated") {
-      setErrorMessage("Authentication required. Please sign in with your administrator account to access the dashboard.");
+      setErrorMessage("Authentication required. Please sign in to access your dashboard.");
     } else if (errorParam === "unauthorized") {
-      setErrorMessage("Access denied. Your account is not authorized as an administrator for Sachin Behera Daily Workflow.");
+      setErrorMessage("Access denied. Your account is not authorized for Sachin Behera Daily Workflow.");
     } else if (errorParam === "session_expired") {
-      setErrorMessage("Your administrator session has expired. Please sign in again.");
+      setErrorMessage("Your session has expired. Please sign in again.");
     }
 
     if (noticeParam === "setup_required") {
-      setSuccessNotice("Phase 2 Supabase Setup: Remote credentials are not configured in .env.local yet. Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to enable live authentication.");
+      setSuccessNotice("Supabase credentials are not configured in .env.local yet. Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to enable live authentication.");
     } else if (messageParam === "signed_out") {
-      setSuccessNotice("You have successfully signed out of the administrator portal.");
+      setSuccessNotice("You have successfully signed out of the portal.");
     }
   }, [searchParams]);
 
@@ -55,13 +52,13 @@ export function LoginForm() {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setErrorMessage("Please enter your administrator email.");
+      setErrorMessage("Please enter your email address.");
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
-      setErrorMessage("Please enter a valid administrator email address.");
+      setErrorMessage("Please enter a valid email address.");
       return;
     }
 
@@ -85,7 +82,7 @@ export function LoginForm() {
         return;
       }
 
-      // Successful authentication & authorized administrator
+      // Successful authentication
       if (result.redirectTo) {
         router.push(result.redirectTo);
         router.refresh();
@@ -98,55 +95,55 @@ export function LoginForm() {
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <div className="bg-navy-900/90 border border-navy-700/80 rounded-2xl p-6 sm:p-8 shadow-panel backdrop-blur-md">
+      <div className="glass-card-dark rounded-2xl p-5 sm:p-7 shadow-2xl backdrop-blur-xl border border-white/15">
         
-        {/* Administrator Badge */}
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-navy-800">
+        {/* Status Badge */}
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
           <div className="flex items-center space-x-2">
-            <span className="flex h-2.5 w-2.5 relative">
+            <span className="flex h-2 w-2 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-orange opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-orange"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-orange"></span>
             </span>
-            <span className="text-xs uppercase tracking-wider font-semibold text-gray-300">
-              Administrator Portal
+            <span className="text-[11px] uppercase tracking-wider font-bold text-gray-300">
+              Secure Portal
             </span>
           </div>
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-navy-800 text-brand-orange border border-navy-700">
-            Single Admin
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-brand-orange border border-white/15">
+            Role-Based Access
           </span>
         </div>
 
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-white tracking-tight">Admin Sign In</h2>
-          <p className="text-sm text-gray-300 mt-1">
-            Access strictly restricted to Sachin Behera (Team Leader). Counselors do not have login accounts.
+        <div className="mb-5">
+          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Sign In</h2>
+          <p className="text-xs text-blue-200/70 mt-1">
+            Access your authorized workflow dashboard with your credentials.
           </p>
         </div>
 
         {/* Informative Notification Banner */}
         {successNotice && (
-          <div className="mb-5 p-3.5 bg-navy-800/90 border-l-4 border-brand-orange rounded-r-lg flex items-start gap-2.5">
-            <Info className="w-4 h-4 text-brand-orange mt-0.5 shrink-0" />
-            <p className="text-xs text-gray-200 leading-relaxed">{successNotice}</p>
+          <div className="mb-4 p-3 bg-blue-500/10 border-l-3 border-[#1677FF] rounded-r-lg flex items-start gap-2 backdrop-blur-xs">
+            <Info className="w-3.5 h-3.5 text-[#1677FF] mt-0.5 shrink-0" />
+            <p className="text-xs text-blue-100 leading-relaxed">{successNotice}</p>
           </div>
         )}
 
         {/* Error Message Display */}
         {errorMessage && (
-          <div className="mb-5 p-3.5 bg-red-950/70 border border-red-500/50 rounded-lg flex items-start gap-2.5 animate-fadeIn">
-            <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+          <div className="mb-4 p-3 bg-red-500/15 border border-red-500/40 rounded-lg flex items-start gap-2 backdrop-blur-xs animate-in fade-in">
+            <AlertCircle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
             <p className="text-xs text-red-200 leading-relaxed">{errorMessage}</p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
           {/* Email Field */}
           <div>
-            <label htmlFor="email" className="block text-xs font-medium text-gray-200 mb-1.5 uppercase tracking-wider">
-              Administrator Email
+            <label htmlFor="email" className="block text-[11px] font-bold text-blue-200/80 mb-1 uppercase tracking-wider">
+              Email Address
             </label>
-            <div className="relative rounded-lg shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+            <div className="relative rounded-lg shadow-xs">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                 <Mail className="h-4 w-4" />
               </div>
               <input
@@ -157,18 +154,18 @@ export function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="sachin.behera@collegevidya.com"
                 disabled={isLoading}
-                className="block w-full pl-10 pr-3.5 py-2.5 bg-navy-950/90 border border-navy-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-all disabled:opacity-60"
+                className="block w-full pl-9 pr-3 py-2 bg-black/25 border border-white/15 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-all disabled:opacity-60"
               />
             </div>
           </div>
 
           {/* Password Field */}
           <div>
-            <label htmlFor="password" className="block text-xs font-medium text-gray-200 mb-1.5 uppercase tracking-wider">
+            <label htmlFor="password" className="block text-[11px] font-bold text-blue-200/80 mb-1 uppercase tracking-wider">
               Password
             </label>
-            <div className="relative rounded-lg shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+            <div className="relative rounded-lg shadow-xs">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                 <Lock className="h-4 w-4" />
               </div>
               <input
@@ -179,7 +176,7 @@ export function LoginForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
                 disabled={isLoading}
-                className="block w-full pl-10 pr-10 py-2.5 bg-navy-950/90 border border-navy-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-all disabled:opacity-60"
+                className="block w-full pl-9 pr-9 py-2 bg-black/25 border border-white/15 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent transition-all disabled:opacity-60"
               />
               <button
                 type="button"
@@ -196,7 +193,7 @@ export function LoginForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full mt-2 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-semibold text-white bg-brand-orange hover:bg-brand-hover active:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-orange focus:ring-offset-navy-900 transition-all shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-brand-orange to-[#FF6B00] hover:from-[#FF7A00] hover:to-[#E65C00] active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-orange focus:ring-offset-[#061B3D] transition-all shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <>
@@ -225,18 +222,18 @@ export function LoginForm() {
             ) : (
               <>
                 <KeyRound className="w-4 h-4" />
-                <span>Sign In as Administrator</span>
+                <span>Sign In to Dashboard</span>
               </>
             )}
           </button>
         </form>
 
-        {/* Phase 2 Security Architecture Footnote */}
-        <div className="mt-6 pt-5 border-t border-navy-800 text-left">
-          <div className="flex items-start gap-2 text-[11px] text-gray-400">
+        {/* Security Footnote */}
+        <div className="mt-4 pt-3.5 border-t border-white/10 text-left">
+          <div className="flex items-start gap-1.5 text-[10px] text-gray-400">
             <ShieldCheck className="w-3.5 h-3.5 text-brand-orange shrink-0 mt-0.5" />
             <span>
-              Server-enforced authorization active. Only accounts in the trusted administrator allowlist are permitted.
+              Server-enforced authorization active. All access is protected via Supabase Row-Level Security.
             </span>
           </div>
         </div>

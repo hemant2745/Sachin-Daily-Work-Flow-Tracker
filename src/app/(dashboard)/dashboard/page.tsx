@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { DashboardHeroBanner } from "@/components/dashboard/DashboardHeroBanner";
+import { AdminPerformanceMatrix } from "@/components/dashboard/AdminPerformanceMatrix";
 import { TeamPerformanceChart } from "@/components/dashboard/TeamPerformanceChart";
 import { QuickActionsCard } from "@/components/dashboard/QuickActionsCard";
 import { MotivationalCard } from "@/components/dashboard/MotivationalCard";
@@ -87,30 +88,46 @@ export default async function DashboardPage() {
   // 4. Calling Performance Summary
   const callingSummary = callingRes.summary;
 
+  // 5. Calendar Proration Telemetry
+  const [yearStr, monthStr] = currentMonthKey.split("-");
+  const yr = parseInt(yearStr, 10);
+  const mo = parseInt(monthStr, 10);
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+  const currentYear = now.getFullYear();
+  const currentMonthNum = now.getMonth() + 1;
+  let elapsedDays = now.getDate();
+  if (yr < currentYear || (yr === currentYear && mo < currentMonthNum)) {
+    elapsedDays = daysInMonth;
+  } else if (yr > currentYear || (yr === currentYear && mo > currentMonthNum)) {
+    elapsedDays = 0;
+  } else {
+    elapsedDays = Math.min(now.getDate(), daysInMonth);
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-5">
       {/* 1. Main Dashboard Banner (Navy to Royal Blue Gradient, S3 Logo, Mission Statement, Taglines) */}
       <DashboardHeroBanner />
 
       {/* 2. Team Performance Metrics (Four Key KPI Cards) */}
       <section>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2.5">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-extrabold text-[#0A2454] uppercase tracking-wider">
+            <h3 className="text-xs sm:text-sm font-extrabold text-[#0A2454] uppercase tracking-wider">
               Team Performance Metrics
             </h3>
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#0866F5] border border-blue-100">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#0866F5] border border-blue-200">
               {monthDisplay}
             </span>
           </div>
 
-          <span className="text-xs text-[#0866F5] font-semibold flex items-center gap-1.5">
+          <span className="text-[11px] text-[#0866F5] font-semibold flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#00A77B] animate-pulse" />
             {configured && hasData ? "Live Production Database" : "Awaiting Database Records"}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
           {/* Card 1: Team Monthly Target */}
           <MetricCard
             title="Team Monthly Target"
@@ -182,24 +199,35 @@ export default async function DashboardPage() {
         </div>
       </section>
 
+      {/* 2.5. Counselor Category & Dynamic Performance Matrix (CDA, SCDA, PCA, Expected vs Actual Proration, 4-Week Progress, Counselor Comparison) */}
+      <section>
+        <AdminPerformanceMatrix
+          counselors={counselorsRes.counselors || []}
+          categorySummaries={counselorsRes.summary?.categorySummaries}
+          monthDisplay={monthDisplay}
+          totalDaysInMonth={daysInMonth}
+          elapsedDays={elapsedDays}
+        />
+      </section>
+
       {/* 3. Featured Calling Performance & APR Telemetry Panel (Prominent Full-Width Section) */}
-      <section className="bg-white border border-[#DFEAFE] rounded-3xl p-6 sm:p-7 shadow-xs hover:shadow-md transition-all">
+      <section className="glass-card rounded-2xl p-4 sm:p-5 shadow-xs">
         {/* Panel Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 mb-5 border-b border-[#DFEAFE]">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0866F5] to-[#18B9E8] flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-              <PhoneCall className="w-6 h-6" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 mb-3.5 border-b border-[#DFEAFE]/70">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0866F5] to-[#18B9E8] flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
+              <PhoneCall className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-black text-[#0A2454]">
+                <h3 className="text-sm sm:text-base font-black text-[#0A2454]">
                   Calling Performance & APR Telemetry
                 </h3>
-                <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-[#0866F5] border border-blue-200">
+                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-[#0866F5] border border-blue-200">
                   Daily Checkpoint
                 </span>
               </div>
-              <p className="text-xs text-[#61789E] mt-0.5">
+              <p className="text-[11px] text-[#61789E] mt-0.5">
                 Official Benchmarks: <strong className="text-[#0A2454]">200 calls</strong> &bull; <strong className="text-[#0A2454]">90 mins talk time</strong> per counsellor
               </p>
             </div>
@@ -207,7 +235,7 @@ export default async function DashboardPage() {
 
           <div className="flex items-center gap-2.5">
             <div className="hidden md:flex flex-col items-end mr-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#61789E]">Team APR Status</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[#61789E]">Team APR Status</span>
               <span className={`text-xs font-black ${
                 (callingSummary?.averageAPR ?? 0) >= 100 ? "text-[#00A77B]" : "text-[#0866F5]"
               }`}>
@@ -218,10 +246,10 @@ export default async function DashboardPage() {
             </div>
             <Link
               href="/dashboard/calling-performance"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#0866F5] to-[#1677FF] hover:from-[#0650c5] hover:to-[#0866F5] text-white text-xs sm:text-[13px] font-bold rounded-xl shadow-xs transition-all"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#0866F5] to-[#1677FF] hover:from-[#0650c5] hover:to-[#0866F5] text-white text-xs font-bold rounded-lg shadow-xs transition-all"
             >
               <span>Calling Console</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
@@ -326,9 +354,9 @@ export default async function DashboardPage() {
       </section>
 
       {/* 4. Operational Queues (Pending Tasks and Pending Projections Side-by-Side) */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
         {/* A. Pending Tasks Card */}
-        <div className="bg-white border border-[#DFEAFE] rounded-2xl p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+        <div className="glass-card rounded-xl p-4 sm:p-4.5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#DFEAFE]">
               <div className="flex items-center space-x-3">
@@ -412,7 +440,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* B. Pending Projection Reviews Card */}
-        <div className="bg-white border border-[#DFEAFE] rounded-2xl p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+        <div className="glass-card rounded-xl p-4 sm:p-4.5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#DFEAFE]">
               <div className="flex items-center space-x-3">
@@ -478,7 +506,7 @@ export default async function DashboardPage() {
       </section>
 
       {/* 4. Analytics and Quick Actions (Three Columns: Trend Chart, Quick Actions, Motivational Card) */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-4">
         {/* Column A: Team Performance Trend Chart */}
         <div className="lg:col-span-1">
           <TeamPerformanceChart
